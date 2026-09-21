@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    Rutas de archivos que el FileProvider puede compartir con apps externas.
+    Requerido por open_filex para abrir PDF/Excel con el visor nativo del dispositivo.
+-->
+<paths>
+    <!-- Directorio interno de la app (getApplicationDocumentsDirectory) -->
+    <files-path name="app_files" path="."/>
+    <!-- Directorio de caché -->
+    <cache-path name="app_cache" path="."/>
+    <!-- Almacenamiento externo de la app -->
+    <external-files-path name="external_files" path="."/>
+</paths>
