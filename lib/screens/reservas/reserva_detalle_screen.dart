@@ -486,7 +486,7 @@ class _ReservaDetalleScreenState extends State<ReservaDetalleScreen> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
-                        const Text(
+                         Text(
                           puedeGestionarVenta ? 'CERRAR COMO VENTA PRESENCIAL' : 'ELEGIR PRENDAS Y PAGAR',
                           style: TextStyle(fontSize: 12, fontWeight: FontWeight.w800, letterSpacing: 0.6, color: AppColors.textSecondary),
                         ),

@@ -89,6 +89,7 @@ class PrendaAR {
   final double anchoBaseCm;
   final double largoBaseCm;
   final String? imagenArUrl;
+  final String? modelo3dUrl;
   final double precio;
   final List<TallaAR> tallas;
   final List<ColorAR> colores;
@@ -104,6 +105,7 @@ class PrendaAR {
     required this.anchoBaseCm,
     required this.largoBaseCm,
     this.imagenArUrl,
+    this.modelo3dUrl,
     required this.precio,
     this.tallas = const [],
     this.colores = const [],
@@ -121,6 +123,7 @@ class PrendaAR {
       anchoBaseCm: (json['ancho_base_cm'] as num?)?.toDouble() ?? 50.0,
       largoBaseCm: (json['largo_base_cm'] as num?)?.toDouble() ?? 70.0,
       imagenArUrl: (json['imagen_ar_url'] ?? json['imagen_url']) as String?,
+      modelo3dUrl: (json['modelo_3d_url'] ?? json['modelo3d_url']) as String?,
       precio: ((json['precio'] ?? json['precio_desde']) as num?)?.toDouble() ?? 0.0,
       tallas: (json['tallas'] as List<dynamic>?)
               ?.map((e) => TallaAR.fromJson(e as Map<String, dynamic>))

@@ -171,6 +171,7 @@ class CatalogoPrendaItem {
   final List<CatalogoTalla> tallas;
   final List<CatalogoColor> colores;
   final String? imagenPrincipal;
+  final String? modelo3dUrl;
   final bool activo;
 
   CatalogoPrendaItem({
@@ -189,6 +190,7 @@ class CatalogoPrendaItem {
     required this.tallas,
     required this.colores,
     this.imagenPrincipal,
+    this.modelo3dUrl,
     required this.activo,
   });
 
@@ -209,6 +211,7 @@ class CatalogoPrendaItem {
       tallas: (json['tallas'] as List<dynamic>?)?.map((e) => CatalogoTalla.fromJson(e as Map<String, dynamic>)).toList() ?? [],
       colores: (json['colores'] as List<dynamic>?)?.map((e) => CatalogoColor.fromJson(e as Map<String, dynamic>)).toList() ?? [],
       imagenPrincipal: json['imagen_principal'],
+      modelo3dUrl: (json['modelo_3d_url'] ?? json['modelo3d_url']) as String?,
       activo: json['activo'] ?? true,
     );
   }
@@ -235,6 +238,7 @@ class CatalogoPrendaDetalle extends CatalogoPrendaItem {
     required super.tallas,
     required super.colores,
     super.imagenPrincipal,
+    super.modelo3dUrl,
     required super.activo,
     required this.colecciones,
     required this.variantes,
@@ -259,6 +263,7 @@ class CatalogoPrendaDetalle extends CatalogoPrendaItem {
       tallas: item.tallas,
       colores: item.colores,
       imagenPrincipal: item.imagenPrincipal,
+      modelo3dUrl: item.modelo3dUrl,
       activo: item.activo,
       colecciones: (json['colecciones'] as List<dynamic>?)?.map((e) => e.toString()).toList() ?? [],
       variantes: (json['variantes'] as List<dynamic>?)?.map((e) => CatalogoVariante.fromJson(e as Map<String, dynamic>)).toList() ?? [],

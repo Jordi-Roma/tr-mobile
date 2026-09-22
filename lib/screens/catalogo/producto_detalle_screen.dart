@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../../core/constants/app_colors.dart';
 import '../../models/catalogo_models.dart';
@@ -18,6 +19,8 @@ import '../../widgets/product_card.dart';
 import '../../widgets/stock_badge.dart';
 import '../admin_catalogo/admin_producto_form_screen.dart';
 import '../auth/login_screen.dart';
+import '../vestidor/probador_ia_screen.dart';
+import '../vestidor/services/vestidor_api_service.dart';
 import '../vestidor/vestidor_screen.dart';
 
 class ProductoDetalleScreen extends StatefulWidget {
@@ -55,6 +58,405 @@ class _ProductoDetalleScreenState extends State<ProductoDetalleScreen> {
     } finally {
       if (mounted) setState(() => _cargandoRecomendaciones = false);
     }
+  }
+
+  Future<void> _lanzarMotor3DDirecto({
+    required String targetUrl,
+    required int productoId,
+    int? varianteId,
+  }) async {
+    final auth = Provider.of<AuthProvider>(context, listen: false);
+
+    // Registrar telemetría de la sesión (CU24) en PostgreSQL
+    VestidorApiService.registrarSesion(
+      clienteId: auth.usuario?.id,
+      productoId: productoId,
+      varianteId: varianteId,
+      origen: 'CATALOGO_3D_DIRECTO',
+    );
+
+    // Modal de Calibración
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: const Color(0xFF0F172A),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        content: const Padding(
+          padding: EdgeInsets.symmetric(vertical: 8),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              CircularProgressIndicator(color: Color(0xFF00E5FF)),
+              SizedBox(height: 18),
+              Text(
+                'Iniciando Motor AR 3D StyleAR...',
+                style: TextStyle(
+                  color: Colors.white,
+                  fontWeight: FontWeight.bold,
+                  fontSize: 16,
+                ),
+              ),
+              SizedBox(height: 8),
+              Text(
+                'Calibrando sensor de tracking a 60 FPS\ny sincronizando telemetría con PostgreSQL (CU24)...',
+                textAlign: TextAlign.center,
+                style: TextStyle(color: Colors.white60, fontSize: 12),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+
+    await Future.delayed(const Duration(milliseconds: 1200));
+    if (mounted) Navigator.pop(context);
+
+    final cleanUrl = targetUrl.trim();
+    final uri = Uri.parse(cleanUrl);
+
+    bool launched = false;
+    // Intento 1: External application (app nativa o navegador externo)
+    try {
+      launched = await launchUrl(uri, mode: LaunchMode.externalApplication);
+    } catch (e) {
+      debugPrint('Error en LaunchMode.externalApplication: $e');
+    }
+
+    // Intento 2: Platform default si no abrió
+    if (!launched) {
+      try {
+        launched = await launchUrl(uri, mode: LaunchMode.platformDefault);
+      } catch (e) {
+        debugPrint('Error en LaunchMode.platformDefault: $e');
+      }
+    }
+
+    // Intento 3: In-app browser como fallback
+    if (!launched) {
+      try {
+        launched = await launchUrl(uri, mode: LaunchMode.inAppBrowserView);
+      } catch (e) {
+        debugPrint('Error en LaunchMode.inAppBrowserView: $e');
+      }
+    }
+
+    if (!launched && mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('No se pudo abrir el motor AR 3D. Verifica el navegador de tu dispositivo.'),
+          backgroundColor: Colors.redAccent,
+        ),
+      );
+    }
+  }
+
+  void _abrirModalOpcionesVestidor(CatalogoPrendaDetalle detalle, CatalogoVariante? varianteActual) {
+    final bool tiene3D = detalle.modelo3dUrl != null && detalle.modelo3dUrl!.trim().isNotEmpty;
+
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: const Color(0xFF0F172A),
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+      ),
+      builder: (ctx) {
+        return SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(20, 16, 20, 24),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Center(
+                  child: Container(
+                    width: 44,
+                    height: 4,
+                    decoration: BoxDecoration(
+                      color: Colors.white24,
+                      borderRadius: BorderRadius.circular(2),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 18),
+                Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(10),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF00E5FF).withValues(alpha: 0.15),
+                        shape: BoxShape.circle,
+                      ),
+                      child: const Icon(Icons.checkroom_rounded, color: Color(0xFF00E5FF), size: 24),
+                    ),
+                    const SizedBox(width: 14),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Text(
+                            'VESTIDOR VIRTUAL STYLE-AR',
+                            style: TextStyle(
+                              color: Colors.white,
+                              fontSize: 16,
+                              fontWeight: FontWeight.bold,
+                              letterSpacing: 0.5,
+                            ),
+                          ),
+                          Text(
+                            detalle.nombre,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(color: Colors.white60, fontSize: 12),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 20),
+
+                // OPCIÓN 1: Simulador con IA (SIEMPRE DISPONIBLE PARA TODOS LOS PRODUCTOS)
+                GestureDetector(
+                  onTap: () {
+                    Navigator.pop(ctx);
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => ProbadorIaScreen(
+                          productoInicialId: detalle.productoId,
+                        ),
+                      ),
+                    );
+                  },
+                  child: Container(
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      gradient: const LinearGradient(
+                        colors: [Color(0xFF1E293B), Color(0xFF0F172A)],
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                      ),
+                      borderRadius: BorderRadius.circular(18),
+                      border: Border.all(
+                        color: const Color(0xFF00E5FF).withValues(alpha: 0.6),
+                        width: 1.5,
+                      ),
+                      boxShadow: [
+                        BoxShadow(
+                          color: const Color(0xFF00E5FF).withValues(alpha: 0.12),
+                          blurRadius: 10,
+                          offset: const Offset(0, 4),
+                        ),
+                      ],
+                    ),
+                    child: Row(
+                      children: [
+                        Container(
+                          width: 48,
+                          height: 48,
+                          decoration: BoxDecoration(
+                            color: const Color(0xFF00E5FF).withValues(alpha: 0.2),
+                            borderRadius: BorderRadius.circular(14),
+                          ),
+                          child: const Icon(
+                            Icons.auto_awesome,
+                            color: Color(0xFF00E5FF),
+                            size: 26,
+                          ),
+                        ),
+                        const SizedBox(width: 14),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Row(
+                                children: [
+                                  const Text(
+                                    'Simulador con IA',
+                                    style: TextStyle(
+                                      color: Colors.white,
+                                      fontWeight: FontWeight.bold,
+                                      fontSize: 15,
+                                    ),
+                                  ),
+                                  const Spacer(),
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                                    decoration: BoxDecoration(
+                                      color: const Color(0xFF10B981).withValues(alpha: 0.2),
+                                      borderRadius: BorderRadius.circular(8),
+                                    ),
+                                    child: const Text(
+                                      '✨ Para Todo el Catálogo',
+                                      style: TextStyle(
+                                        color: Color(0xFF10B981),
+                                        fontSize: 10,
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(height: 5),
+                              const Text(
+                                'Pruébate esta prenda subiendo tu foto. La IA ajusta la fisonomía y sombras usando la imagen del producto (no requiere 3D).',
+                                style: TextStyle(
+                                  color: Colors.white70,
+                                  fontSize: 11,
+                                  height: 1.3,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+
+                const SizedBox(height: 14),
+
+                // OPCIÓN 2: Vestidor 3D en Vivo (EN GRIS SOLO SI NO TIENE MODELO 3D)
+                GestureDetector(
+                  onTap: tiene3D
+                      ? () {
+                          Navigator.pop(ctx);
+                          _lanzarMotor3DDirecto(
+                            targetUrl: detalle.modelo3dUrl!,
+                            productoId: detalle.productoId,
+                            varianteId: varianteActual?.id,
+                          );
+                        }
+                      : () {
+                          Navigator.pop(ctx);
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                              content: Text(
+                                'Esta prenda aún no cuenta con modelo 3D en vivo. Utiliza la opción "Simulador con IA" para probártela.',
+                              ),
+                              backgroundColor: Color(0xFF334155),
+                              duration: Duration(seconds: 3),
+                            ),
+                          );
+                        },
+                  child: Container(
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      color: tiene3D
+                          ? const Color(0xFF1E293B).withValues(alpha: 0.6)
+                          : const Color(0xFF1E293B).withValues(alpha: 0.25),
+                      borderRadius: BorderRadius.circular(18),
+                      border: Border.all(
+                        color: tiene3D ? const Color(0xFF60A5FA).withValues(alpha: 0.5) : Colors.white10,
+                        width: tiene3D ? 1.2 : 1,
+                      ),
+                    ),
+                    child: Row(
+                      children: [
+                        Container(
+                          width: 48,
+                          height: 48,
+                          decoration: BoxDecoration(
+                            color: tiene3D
+                                ? const Color(0xFF3B82F6).withValues(alpha: 0.2)
+                                : Colors.white.withValues(alpha: 0.04),
+                            borderRadius: BorderRadius.circular(14),
+                          ),
+                          child: Icon(
+                            Icons.view_in_ar_rounded,
+                            color: tiene3D ? const Color(0xFF60A5FA) : Colors.white24,
+                            size: 26,
+                          ),
+                        ),
+                        const SizedBox(width: 14),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Row(
+                                children: [
+                                  Text(
+                                    'Vestidor 3D en Vivo',
+                                    style: TextStyle(
+                                      color: tiene3D ? Colors.white : Colors.white38,
+                                      fontWeight: FontWeight.bold,
+                                      fontSize: 15,
+                                    ),
+                                  ),
+                                  const Spacer(),
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                                    decoration: BoxDecoration(
+                                      color: tiene3D
+                                          ? Colors.blueAccent.withValues(alpha: 0.2)
+                                          : Colors.white.withValues(alpha: 0.05),
+                                      borderRadius: BorderRadius.circular(8),
+                                    ),
+                                    child: Text(
+                                      tiene3D ? 'Tracking 60 FPS' : 'No disponible en 3D',
+                                      style: TextStyle(
+                                        color: tiene3D ? const Color(0xFF60A5FA) : Colors.white38,
+                                        fontSize: 10,
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(height: 5),
+                              Text(
+                                tiene3D
+                                    ? 'Tracking corporal completo a 60 FPS con física de tela volumétrica en tiempo real.'
+                                    : 'Esta prenda aún no cuenta con modelo volumétrico 3D. Elige "Simulador con IA" para probártela.',
+                                style: TextStyle(
+                                  color: tiene3D ? Colors.white70 : Colors.white30,
+                                  fontSize: 11,
+                                  height: 1.3,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+
+                const SizedBox(height: 16),
+
+                // Acceso al Estudio de Outfits Completo (VestidorScreen)
+                Center(
+                  child: TextButton.icon(
+                    onPressed: () {
+                      Navigator.pop(ctx);
+                      Navigator.of(context).push(
+                        MaterialPageRoute(
+                          builder: (_) => VestidorScreen(
+                            productoId: detalle.productoId,
+                            varianteInicialId: varianteActual?.id,
+                          ),
+                        ),
+                      );
+                    },
+                    icon: const Icon(Icons.style_outlined, color: Colors.white60, size: 16),
+                    label: const Text(
+                      'Combinar en Estudio de Outfits Completo',
+                      style: TextStyle(
+                        color: Colors.white70,
+                        fontSize: 12,
+                        decoration: TextDecoration.underline,
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
   }
 
   void _abrirDisponibilidadPorSucursal(CatalogoPrendaDetalle detalle) {
@@ -559,18 +961,20 @@ class _ProductoDetalleScreenState extends State<ProductoDetalleScreen> {
                             const SizedBox(height: 20),
                           ],
 
-                          // Botón Vestidor Virtual AR (CU24)
+                          // Botón Probar en Vestidor Virtual (CU24) - Siempre activo para todo el catálogo
                           Container(
                             margin: const EdgeInsets.only(bottom: 12),
                             decoration: BoxDecoration(
-                              borderRadius: BorderRadius.circular(12),
+                              borderRadius: BorderRadius.circular(14),
                               gradient: const LinearGradient(
                                 colors: [Color(0xFF0F172A), Color(0xFF1E293B)],
                               ),
+                              border: Border.all(
+                                color: const Color(0xFF00E5FF).withValues(alpha: 0.35),
+                              ),
                               boxShadow: [
                                 BoxShadow(
-                                  color: const Color(0xFF0F172A)
-                                      .withValues(alpha: 0.25),
+                                  color: const Color(0xFF0F172A).withValues(alpha: 0.3),
                                   blurRadius: 8,
                                   offset: const Offset(0, 3),
                                 ),
@@ -579,17 +983,8 @@ class _ProductoDetalleScreenState extends State<ProductoDetalleScreen> {
                             child: Material(
                               color: Colors.transparent,
                               child: InkWell(
-                                borderRadius: BorderRadius.circular(12),
-                                onTap: () {
-                                  Navigator.of(context).push(
-                                    MaterialPageRoute(
-                                      builder: (_) => VestidorScreen(
-                                        productoId: widget.productoId,
-                                        varianteInicialId: varianteActual?.id,
-                                      ),
-                                    ),
-                                  );
-                                },
+                                borderRadius: BorderRadius.circular(14),
+                                onTap: () => _abrirModalOpcionesVestidor(detalle, varianteActual),
                                 child: const Padding(
                                   padding: EdgeInsets.symmetric(
                                     vertical: 14,
@@ -599,13 +994,13 @@ class _ProductoDetalleScreenState extends State<ProductoDetalleScreen> {
                                     mainAxisAlignment: MainAxisAlignment.center,
                                     children: [
                                       Icon(
-                                        Icons.view_in_ar_rounded,
+                                        Icons.checkroom_rounded,
                                         color: Color(0xFF00E5FF),
                                         size: 22,
                                       ),
                                       SizedBox(width: 10),
                                       Text(
-                                        'Probar en Vestidor Virtual (AR)',
+                                        'Probar en Vestidor Virtual',
                                         style: TextStyle(
                                           color: Colors.white,
                                           fontWeight: FontWeight.w700,
