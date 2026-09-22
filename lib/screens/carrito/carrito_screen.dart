@@ -47,7 +47,7 @@ class _CarritoScreenState extends State<CarritoScreen> {
   @override
   void initState() {
     super.initState();
-    _fechaCitaReserva = _soloFecha(DateTime.now().add(const Duration(days: 1)));
+    _fechaCitaReserva = _soloFecha(DateTime.now());
     WidgetsBinding.instance.addPostFrameCallback((_) {
       final auth = context.read<AuthProvider>();
       if (auth.estaAutenticado) {
