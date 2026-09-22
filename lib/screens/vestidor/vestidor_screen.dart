@@ -122,8 +122,13 @@ class _VestidorScreenState extends State<VestidorScreen> {
     }
   }
 
-  static const String _arEngineUrl =
-      'https://www.snapchat.com/unlock/?type=SNAPCODE&uuid=b5d99fe6e0d5428593ade7347131cd6e&metadata=01';
+  String? get _urlLenteActivo {
+    final sup = _superiorSeleccionada?.modelo3dUrl?.trim();
+    if (sup != null && sup.isNotEmpty) return sup;
+    final inf = _inferiorSeleccionada?.modelo3dUrl?.trim();
+    if (inf != null && inf.isNotEmpty) return inf;
+    return null;
+  }
 
   void _abrirEspejoVirtualAR() {
     showModalBottomSheet(
@@ -258,70 +263,109 @@ class _VestidorScreenState extends State<VestidorScreen> {
             ),
           ),
           const SizedBox(height: 12),
-          // Opción 2: Motor AR 3D Avanzado (Snapchat Lens Oficial)
-          GestureDetector(
-            onTap: () {
-              Navigator.pop(modalContext);
-              _lanzarMotorARNeuronal();
-            },
-            child: Container(
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: const Color(0xFF1E293B).withValues(alpha: 0.6),
-                borderRadius: BorderRadius.circular(18),
-                border: Border.all(color: Colors.white12, width: 1),
-              ),
-              child: Row(
-                children: [
-                  Container(
-                    width: 46,
-                    height: 46,
-                    decoration: BoxDecoration(
-                      color: Colors.white10,
-                      borderRadius: BorderRadius.circular(14),
-                    ),
-                    child: const Icon(Icons.view_in_ar_rounded, color: Color(0xFF00E5FF), size: 24),
-                  ),
-                  const SizedBox(width: 14),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Row(
-                          children: [
-                            const Text(
-                              'Motor AR 3D (Tracking 60 FPS)',
-                              style: TextStyle(
-                                color: Colors.white,
-                                fontWeight: FontWeight.bold,
-                                fontSize: 14,
-                              ),
+          // Opción 2: Motor AR 3D Avanzado (Tracking 60 FPS)
+          Builder(
+            builder: (context) {
+              final String? urlMotor = _urlLenteActivo;
+              final bool tieneMotor = urlMotor != null && urlMotor.isNotEmpty;
+
+              return GestureDetector(
+                onTap: tieneMotor
+                    ? () {
+                        Navigator.pop(modalContext);
+                        _lanzarMotorARNeuronal(urlMotor);
+                      }
+                    : () {
+                        Navigator.pop(modalContext);
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text(
+                              'Esta prenda no cuenta con calibración de sensor 3D.',
                             ),
-                            const Spacer(),
-                            Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                              decoration: BoxDecoration(
-                                color: Colors.blueAccent.withValues(alpha: 0.2),
-                                borderRadius: BorderRadius.circular(8),
-                              ),
-                              child: const Text(
-                                'Sensor 3D',
-                                style: TextStyle(color: Color(0xFF60A5FA), fontSize: 10, fontWeight: FontWeight.bold),
+                            backgroundColor: Color(0xFF334155),
+                          ),
+                        );
+                      },
+                child: Container(
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: tieneMotor
+                        ? const Color(0xFF1E293B).withValues(alpha: 0.6)
+                        : const Color(0xFF1E293B).withValues(alpha: 0.25),
+                    borderRadius: BorderRadius.circular(18),
+                    border: Border.all(
+                      color: tieneMotor ? Colors.white12 : Colors.white10,
+                      width: 1,
+                    ),
+                  ),
+                  child: Row(
+                    children: [
+                      Container(
+                        width: 46,
+                        height: 46,
+                        decoration: BoxDecoration(
+                          color: tieneMotor ? Colors.white10 : Colors.white.withValues(alpha: 0.04),
+                          borderRadius: BorderRadius.circular(14),
+                        ),
+                        child: Icon(
+                          Icons.view_in_ar_rounded,
+                          color: tieneMotor ? const Color(0xFF00E5FF) : Colors.white24,
+                          size: 24,
+                        ),
+                      ),
+                      const SizedBox(width: 14),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              children: [
+                                Text(
+                                  'Vestidor 3D en Vivo',
+                                  style: TextStyle(
+                                    color: tieneMotor ? Colors.white : Colors.white38,
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 14,
+                                  ),
+                                ),
+                                const Spacer(),
+                                Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                                  decoration: BoxDecoration(
+                                    color: tieneMotor
+                                        ? Colors.blueAccent.withValues(alpha: 0.2)
+                                        : Colors.white.withValues(alpha: 0.05),
+                                    borderRadius: BorderRadius.circular(8),
+                                  ),
+                                  child: Text(
+                                    tieneMotor ? 'Tracking 60 FPS' : 'No disponible en 3D',
+                                    style: TextStyle(
+                                      color: tieneMotor ? const Color(0xFF60A5FA) : Colors.white38,
+                                      fontSize: 10,
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 4),
+                            Text(
+                              tieneMotor
+                                  ? 'Tracking corporal completo y física de tela en tiempo real con modelo calibrado.'
+                                  : 'Esta prenda aún no cuenta con modelo volumétrico 3D calibrado.',
+                              style: TextStyle(
+                                color: tieneMotor ? Colors.white70 : Colors.white30,
+                                fontSize: 11,
                               ),
                             ),
                           ],
                         ),
-                        const SizedBox(height: 4),
-                        const Text(
-                          'Tracking corporal completo y física de tela en tiempo real con lente 3D calibrado (CU24).',
-                          style: TextStyle(color: Colors.white70, fontSize: 11),
-                        ),
-                      ],
-                    ),
+                      ),
+                    ],
                   ),
-                ],
-              ),
-            ),
+                ),
+              );
+            },
           ),
           const SizedBox(height: 12),
           // Opción 3: Espejo en Vivo (Cámara Interna)
@@ -378,8 +422,21 @@ class _VestidorScreenState extends State<VestidorScreen> {
     );
   }
 
-  Future<void> _lanzarMotorARNeuronal() async {
+  Future<void> _lanzarMotorARNeuronal([String? customUrl]) async {
     final auth = Provider.of<AuthProvider>(context, listen: false);
+    final targetUrl = customUrl ?? _urlLenteActivo;
+
+    if (targetUrl == null || targetUrl.isEmpty) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('La prenda seleccionada no cuenta con calibración de motor 3D.'),
+            backgroundColor: Color(0xFF334155),
+          ),
+        );
+      }
+      return;
+    }
 
     // Registrar telemetría de la sesión (CU24) en PostgreSQL
     if (_superiorSeleccionada != null) {
@@ -412,7 +469,7 @@ class _VestidorScreenState extends State<VestidorScreen> {
               CircularProgressIndicator(color: Color(0xFF00E5FF)),
               SizedBox(height: 18),
               Text(
-                'Iniciando Motor AR Neural...',
+                'Iniciando Motor AR Neural StyleAR...',
                 style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16),
               ),
               SizedBox(height: 8),
@@ -430,26 +487,42 @@ class _VestidorScreenState extends State<VestidorScreen> {
     await Future.delayed(const Duration(milliseconds: 1200));
     if (mounted) Navigator.pop(context);
 
-    final uri = Uri.parse(_arEngineUrl);
+    final cleanUrl = targetUrl.trim();
+    final uri = Uri.parse(cleanUrl);
+
+    bool launched = false;
+    // Intento 1: External application (app nativa o navegador externo)
     try {
-      final launched = await launchUrl(uri, mode: LaunchMode.externalApplication);
-      if (!launched && mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('El servicio de aceleración AR requiere el sensor 3D en el dispositivo.'),
-            backgroundColor: Colors.redAccent,
-          ),
-        );
-      }
+      launched = await launchUrl(uri, mode: LaunchMode.externalApplication);
     } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Error al conectar con el sensor AR: $e'),
-            backgroundColor: Colors.redAccent,
-          ),
-        );
+      debugPrint('Error en LaunchMode.externalApplication: $e');
+    }
+
+    // Intento 2: Platform default
+    if (!launched) {
+      try {
+        launched = await launchUrl(uri, mode: LaunchMode.platformDefault);
+      } catch (e) {
+        debugPrint('Error en LaunchMode.platformDefault: $e');
       }
+    }
+
+    // Intento 3: In-app browser
+    if (!launched) {
+      try {
+        launched = await launchUrl(uri, mode: LaunchMode.inAppBrowserView);
+      } catch (e) {
+        debugPrint('Error en LaunchMode.inAppBrowserView: $e');
+      }
+    }
+
+    if (!launched && mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('No se pudo abrir el motor AR 3D. Verifica el navegador de tu dispositivo.'),
+          backgroundColor: Colors.redAccent,
+        ),
+      );
     }
   }
 
@@ -1210,7 +1283,7 @@ class _VestidorScreenState extends State<VestidorScreen> {
 
         const SizedBox(height: 12),
 
-        // BOTÓN SECUNDARIO: Opciones AR en Vivo (Snapchat / Espejo)
+        // BOTÓN SECUNDARIO: Opciones de Sensor AR 3D / Espejo Virtual
         SizedBox(
           width: double.infinity,
           height: 48,
@@ -1222,7 +1295,7 @@ class _VestidorScreenState extends State<VestidorScreen> {
             ),
             icon: const Icon(Icons.view_in_ar_rounded, color: Color(0xFF00E5FF), size: 20),
             label: const Text(
-              'Opciones AR en Vivo (Snapchat / Espejo)',
+              'Sensor 3D en Vivo / Espejo Virtual',
               style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 13),
             ),
             onPressed: tieneAlguna ? _abrirEspejoVirtualAR : null,
