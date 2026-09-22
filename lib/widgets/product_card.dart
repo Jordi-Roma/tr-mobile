@@ -104,7 +104,7 @@ class ProductCard extends StatelessWidget {
                           vertical: 4,
                         ),
                         decoration: BoxDecoration(
-                          color: AppColors.primary,
+                          color: AppColors.danger,
                           borderRadius: BorderRadius.circular(12),
                         ),
                         child: const Text(
@@ -230,28 +230,32 @@ class ProductCard extends StatelessWidget {
                       ),
                     ),
                   ],
-                  Row(
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(
-                        currencyFormat.format(prenda.precioFinal),
-                        style: const TextStyle(
-                          fontSize: 14,
-                          fontWeight: FontWeight.w700,
-                          color: AppColors.primary,
-                        ),
-                      ),
                       if (prenda.tienePromocion &&
                           prenda.precioVigente != null) ...[
-                        const SizedBox(width: 6),
                         Text(
                           currencyFormat.format(prenda.precioVigente),
                           style: const TextStyle(
                             fontSize: 11,
                             decoration: TextDecoration.lineThrough,
                             color: AppColors.textSecondary,
+                            fontWeight: FontWeight.w600,
                           ),
                         ),
+                        const SizedBox(height: 1),
                       ],
+                      Text(
+                        currencyFormat.format(prenda.precioFinal),
+                        style: TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w800,
+                          color: prenda.tienePromocion
+                              ? AppColors.danger
+                              : AppColors.primary,
+                        ),
+                      ),
                     ],
                   ),
                 ],

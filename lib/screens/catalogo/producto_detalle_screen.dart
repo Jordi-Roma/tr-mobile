@@ -322,6 +322,10 @@ class _ProductoDetalleScreenState extends State<ProductoDetalleScreen> {
         _varianteSeleccionada ??
         (detalle.variantes.isNotEmpty ? detalle.variantes.first : null);
     final precio = varianteActual?.precioFinal ?? detalle.precioFinal;
+    final tienePromocion =
+        varianteActual?.tienePromocion ?? detalle.tienePromocion;
+    final precioVigente =
+        varianteActual?.precioVigente ?? detalle.precioVigente;
 
     return Scaffold(
       appBar: AppBar(
@@ -452,28 +456,52 @@ class _ProductoDetalleScreenState extends State<ProductoDetalleScreen> {
                           const SizedBox(height: 8),
 
                           // Precio
-                          Row(
+                          Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              Text(
-                                currencyFormat.format(precio),
-                                style: const TextStyle(
-                                  fontSize: 22,
-                                  fontWeight: FontWeight.w800,
-                                  color: AppColors.primary,
+                              if (tienePromocion)
+                                Container(
+                                  margin: const EdgeInsets.only(bottom: 8),
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 10,
+                                    vertical: 5,
+                                  ),
+                                  decoration: BoxDecoration(
+                                    color: AppColors.danger,
+                                    borderRadius: BorderRadius.circular(999),
+                                  ),
+                                  child: const Text(
+                                    'OFERTA',
+                                    style: TextStyle(
+                                      color: Colors.white,
+                                      fontSize: 11,
+                                      fontWeight: FontWeight.w800,
+                                      letterSpacing: 0.7,
+                                    ),
+                                  ),
                                 ),
-                              ),
-                              if (detalle.tienePromocion &&
-                                  detalle.precioVigente != null) ...[
-                                const SizedBox(width: 8),
+                              if (tienePromocion && precioVigente != null) ...[
                                 Text(
-                                  currencyFormat.format(detalle.precioVigente),
+                                  currencyFormat.format(precioVigente),
                                   style: const TextStyle(
                                     fontSize: 14,
                                     decoration: TextDecoration.lineThrough,
                                     color: AppColors.textSecondary,
+                                    fontWeight: FontWeight.w600,
                                   ),
                                 ),
+                                const SizedBox(height: 2),
                               ],
+                              Text(
+                                currencyFormat.format(precio),
+                                style: TextStyle(
+                                  fontSize: 24,
+                                  fontWeight: FontWeight.w900,
+                                  color: tienePromocion
+                                      ? AppColors.danger
+                                      : AppColors.primary,
+                                ),
+                              ),
                             ],
                           ),
                           const SizedBox(height: 20),
