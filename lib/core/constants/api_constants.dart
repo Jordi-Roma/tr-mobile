@@ -118,6 +118,12 @@ class ApiConstants {
   static String deliveryDetalle(int deliveryId) => '$baseUrl/delivery/$deliveryId';
   static String deliveryEstado(int deliveryId) => '$baseUrl/delivery/$deliveryId/estado';
 
+  // Endpoints Panel Proveedor
+  static String get proveedorPanelPerfil => '$baseUrl/proveedor-panel/perfil';
+  static String get proveedorPanelProductos => '$baseUrl/proveedor-panel/productos';
+  static String get proveedorPanelStock => '$baseUrl/proveedor-panel/stock';
+  static String get proveedorPanelEntregas => '$baseUrl/proveedor-panel/entregas';
+
   // Endpoints Reportes / Dashboard (CU21)
   static String get reportesCatalogo => '$baseUrl/reportes/catalogo';
   static String get reportesInterpretar => '$baseUrl/reportes/interpretar';

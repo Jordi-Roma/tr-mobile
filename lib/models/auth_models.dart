@@ -20,6 +20,7 @@ class UsuarioAutenticado {
   bool get esAdmin => roles.contains('ADMINISTRADOR');
   bool get esEncargado => roles.contains('ENCARGADO_SUCURSAL');
   bool get esCajero => roles.contains('CAJERO');
+  bool get esProveedor => roles.contains('PROVEEDOR');
   bool get esAdminOEncargado => esAdmin || esEncargado;
 
   factory UsuarioAutenticado.fromJson(Map<String, dynamic> json) {

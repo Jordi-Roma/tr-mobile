@@ -11,6 +11,7 @@ import '../../widgets/custom_text_field.dart';
 import '../auth/login_screen.dart';
 import '../delivery/historial_delivery_screen.dart';
 import '../pagos/historial_pagos_screen.dart';
+import 'proveedor_panel_screen.dart';
 
 class PerfilScreen extends StatefulWidget {
   const PerfilScreen({super.key});
@@ -520,6 +521,20 @@ class _PerfilScreenState extends State<PerfilScreen> {
                         );
                       },
                     ),
+                    if (auth.esProveedor) ...[
+                      const Divider(),
+                      ListTile(
+                        leading: const Icon(Icons.storefront_outlined, color: AppColors.primary),
+                        title: const Text('Panel proveedor'),
+                        subtitle: const Text('Consulta tus productos, stock y entregas'),
+                        trailing: const Icon(Icons.chevron_right),
+                        onTap: () {
+                          Navigator.of(context).push(
+                            MaterialPageRoute(builder: (_) => const ProveedorPanelScreen()),
+                          );
+                        },
+                      ),
+                    ],
                     const Divider(),
                     ListTile(
                       leading: const Icon(Icons.phone_outlined, color: AppColors.primary),
