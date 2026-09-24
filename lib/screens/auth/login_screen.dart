@@ -37,8 +37,10 @@ class _LoginScreenState extends State<LoginScreen> {
     );
 
     if (success && mounted) {
-      context.read<CarritoProvider>().cargarCarrito();
-      context.read<FavoritosProvider>().cargarFavoritos();
+      context.read<CarritoProvider>().limpiarCarrito();
+      context.read<FavoritosProvider>().limpiar();
+      await context.read<CarritoProvider>().cargarCarrito();
+      await context.read<FavoritosProvider>().cargarFavoritos();
       Navigator.of(context).pop(); // Cierra login si fue abierto modalmente
     }
   }

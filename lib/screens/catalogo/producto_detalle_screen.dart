@@ -633,6 +633,18 @@ class _ProductoDetalleScreenState extends State<ProductoDetalleScreen> {
       return;
     }
 
+    if (variante.stockTotal <= 0) {
+      ScaffoldMessenger.of(context).hideCurrentSnackBar();
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Esta variante ya no tiene stock disponible.'),
+          backgroundColor: AppColors.danger,
+          duration: Duration(seconds: 2),
+        ),
+      );
+      return;
+    }
+
     final carrito = context.read<CarritoProvider>();
     final ok = await carrito.agregarItem(
       varianteId: variante.id,
@@ -931,6 +943,7 @@ class _ProductoDetalleScreenState extends State<ProductoDetalleScreen> {
                                 final label =
                                     '${variante.talla ?? ""} - ${variante.color ?? ""}'
                                         .trim();
+                                final sinStock = variante.stockTotal <= 0;
                                 return ChoiceChip(
                                   label: Text(
                                     label.isNotEmpty
@@ -940,7 +953,9 @@ class _ProductoDetalleScreenState extends State<ProductoDetalleScreen> {
                                   selected: isSelected,
                                   selectedColor: AppColors.primary,
                                   labelStyle: TextStyle(
-                                    color: isSelected
+                                    color: sinStock
+                                        ? AppColors.textSecondary
+                                        : isSelected
                                         ? Colors.white
                                         : AppColors.textPrimary,
                                     fontWeight: isSelected
@@ -948,10 +963,13 @@ class _ProductoDetalleScreenState extends State<ProductoDetalleScreen> {
                                         : FontWeight.normal,
                                     fontSize: 12,
                                   ),
-                                  onSelected: (selected) {
+                                  onSelected: sinStock ? null : (selected) {
                                     if (selected) {
                                       setState(() {
                                         _varianteSeleccionada = variante;
+                                        if (_cantidad > variante.stockTotal) {
+                                          _cantidad = variante.stockTotal;
+                                        }
                                       });
                                     }
                                   },
@@ -1070,8 +1088,10 @@ class _ProductoDetalleScreenState extends State<ProductoDetalleScreen> {
                                     ),
                                     IconButton(
                                       icon: const Icon(Icons.add, size: 18),
-                                      onPressed: () =>
-                                          setState(() => _cantidad++),
+                                      onPressed: varianteActual != null &&
+                                              varianteActual.stockTotal > _cantidad
+                                          ? () => setState(() => _cantidad++)
+                                          : null,
                                     ),
                                   ],
                                 ),
@@ -1217,9 +1237,13 @@ class _ProductoDetalleScreenState extends State<ProductoDetalleScreen> {
                   Expanded(
                     flex: 2,
                     child: CustomButton(
-                      text: 'Agregar al Carrito',
+                      text: (varianteActual?.stockTotal ?? 0) <= 0
+                          ? 'Sin stock'
+                          : 'Agregar al Carrito',
                       icon: Icons.shopping_bag_outlined,
-                      onPressed: () => _agregarAlCarrito(detalle),
+                      onPressed: (varianteActual?.stockTotal ?? 0) <= 0
+                          ? null
+                          : () => _agregarAlCarrito(detalle),
                     ),
                   ),
                 ],
