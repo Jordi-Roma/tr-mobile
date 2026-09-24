@@ -5,6 +5,7 @@ import '../../core/constants/app_colors.dart';
 import '../../models/pago_models.dart';
 import '../../providers/auth_provider.dart';
 import '../../services/pago_service.dart';
+import '../../widgets/payment_status_badge.dart';
 import 'detalle_pago_screen.dart';
 
 class HistorialPagosScreen extends StatefulWidget {
@@ -167,7 +168,7 @@ class _PagoCard extends StatelessWidget {
                     'Orden #${pago.ordenId}',
                     style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 16),
                   ),
-                  _EstadoBadge(estado: pago.estado),
+                  PaymentStatusBadge(estado: pago.estado),
                 ],
               ),
               const SizedBox(height: 8),
@@ -182,6 +183,7 @@ class _PagoCard extends StatelessWidget {
               const SizedBox(height: 10),
               _InfoLine(icon: Icons.receipt_long_outlined, text: pago.ventaCodigo ?? 'Venta #${pago.ventaId}'),
               _InfoLine(icon: Icons.payment_outlined, text: '${pago.metodo} · ${pago.proveedor}'),
+              _InfoLine(icon: Icons.info_outline, text: paymentStatusVisual(pago.estado).description),
               _InfoLine(icon: Icons.calendar_today_outlined, text: _formatFecha(pago.fechaPago ?? pago.fechaCreacion)),
               if (pago.sucursalNombre != null)
                 _InfoLine(icon: Icons.store_outlined, text: pago.sucursalNombre!),
@@ -221,29 +223,6 @@ class _InfoLine extends StatelessWidget {
   }
 }
 
-class _EstadoBadge extends StatelessWidget {
-  final String estado;
-
-  const _EstadoBadge({required this.estado});
-
-  @override
-  Widget build(BuildContext context) {
-    final color = _estadoColor(estado);
-    final background = _estadoBackground(estado);
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-      decoration: BoxDecoration(
-        color: background,
-        borderRadius: BorderRadius.circular(999),
-      ),
-      child: Text(
-        estado,
-        style: TextStyle(fontWeight: FontWeight.w900, color: color, fontSize: 11),
-      ),
-    );
-  }
-}
-
 String _formatMonto(double value) => 'Bs ${value.toStringAsFixed(2)}';
 
 String _formatFecha(String value) {
@@ -251,34 +230,4 @@ String _formatFecha(String value) {
   if (fecha == null) return value;
   final local = fecha.toLocal();
   return '${local.day.toString().padLeft(2, '0')}/${local.month.toString().padLeft(2, '0')}/${local.year} ${local.hour.toString().padLeft(2, '0')}:${local.minute.toString().padLeft(2, '0')}';
-}
-
-Color _estadoColor(String estado) {
-  switch (estado.toUpperCase()) {
-    case 'PAGADO':
-      return AppColors.success;
-    case 'PENDIENTE':
-      return AppColors.warning;
-    case 'RECHAZADO':
-    case 'EXPIRADO':
-    case 'CANCELADO':
-      return AppColors.danger;
-    default:
-      return AppColors.textSecondary;
-  }
-}
-
-Color _estadoBackground(String estado) {
-  switch (estado.toUpperCase()) {
-    case 'PAGADO':
-      return AppColors.successSoft;
-    case 'PENDIENTE':
-      return AppColors.warningSoft;
-    case 'RECHAZADO':
-    case 'EXPIRADO':
-    case 'CANCELADO':
-      return AppColors.dangerSoft;
-    default:
-      return AppColors.background;
-  }
 }

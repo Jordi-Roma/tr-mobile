@@ -103,6 +103,8 @@ class OrdenPagoResponse {
 
   bool get cancelado =>
       estado.toUpperCase() == 'CANCELADO' ||
+      estado.toUpperCase() == 'RECHAZADO' ||
+      estado.toUpperCase() == 'EXPIRADO' ||
       estado.toUpperCase() == 'FALLIDO';
 }
 

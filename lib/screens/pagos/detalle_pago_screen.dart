@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../core/constants/app_colors.dart';
 import '../../models/pago_models.dart';
 import '../../services/pago_service.dart';
+import '../../widgets/payment_status_badge.dart';
 
 class DetallePagoScreen extends StatefulWidget {
   final int ordenId;
@@ -96,6 +97,7 @@ class _DetallePagoScreenState extends State<DetallePagoScreen> {
     if (pago == null) {
       return const Center(child: Text('Pago no encontrado.'));
     }
+    final estadoVisual = paymentStatusVisual(pago.estado);
 
     return ListView(
       padding: const EdgeInsets.all(16),
@@ -106,7 +108,12 @@ class _DetallePagoScreenState extends State<DetallePagoScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                _EstadoBadge(estado: pago.estado),
+                PaymentStatusBadge(estado: pago.estado, showIcon: true),
+                const SizedBox(height: 8),
+                Text(
+                  estadoVisual.description,
+                  style: const TextStyle(color: AppColors.textSecondary, fontWeight: FontWeight.w600),
+                ),
                 const SizedBox(height: 14),
                 Text(
                   'Orden #${pago.ordenId}',
@@ -204,29 +211,6 @@ class _DetailRow extends StatelessWidget {
   }
 }
 
-class _EstadoBadge extends StatelessWidget {
-  final String estado;
-
-  const _EstadoBadge({required this.estado});
-
-  @override
-  Widget build(BuildContext context) {
-    final color = _estadoColor(estado);
-    final background = _estadoBackground(estado);
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-      decoration: BoxDecoration(
-        color: background,
-        borderRadius: BorderRadius.circular(999),
-      ),
-      child: Text(
-        estado,
-        style: TextStyle(fontWeight: FontWeight.w900, color: color, fontSize: 11),
-      ),
-    );
-  }
-}
-
 String _formatMonto(double value) => 'Bs ${value.toStringAsFixed(2)}';
 
 String _formatFecha(String value) {
@@ -234,34 +218,4 @@ String _formatFecha(String value) {
   if (fecha == null) return value;
   final local = fecha.toLocal();
   return '${local.day.toString().padLeft(2, '0')}/${local.month.toString().padLeft(2, '0')}/${local.year} ${local.hour.toString().padLeft(2, '0')}:${local.minute.toString().padLeft(2, '0')}';
-}
-
-Color _estadoColor(String estado) {
-  switch (estado.toUpperCase()) {
-    case 'PAGADO':
-      return AppColors.success;
-    case 'PENDIENTE':
-      return AppColors.warning;
-    case 'RECHAZADO':
-    case 'EXPIRADO':
-    case 'CANCELADO':
-      return AppColors.danger;
-    default:
-      return AppColors.textSecondary;
-  }
-}
-
-Color _estadoBackground(String estado) {
-  switch (estado.toUpperCase()) {
-    case 'PAGADO':
-      return AppColors.successSoft;
-    case 'PENDIENTE':
-      return AppColors.warningSoft;
-    case 'RECHAZADO':
-    case 'EXPIRADO':
-    case 'CANCELADO':
-      return AppColors.dangerSoft;
-    default:
-      return AppColors.background;
-  }
 }

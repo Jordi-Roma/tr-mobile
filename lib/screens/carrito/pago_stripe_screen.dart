@@ -6,6 +6,7 @@ import '../../core/constants/app_colors.dart';
 import '../../models/pago_models.dart';
 import '../../services/pago_service.dart';
 import '../../core/network/api_exceptions.dart';
+import '../../widgets/payment_status_badge.dart';
 
 /// Pantalla de pago con Stripe — abre el checkout_url en un WebView interno.
 /// Al detectar la URL de retorno (success o cancel), consulta el estado de la orden.
@@ -296,23 +297,16 @@ class _ResultadoPagoContent extends StatelessWidget {
   Widget build(BuildContext context) {
     final bool exito = orden.pagado;
     final bool pendiente = orden.pendiente;
+    final visual = paymentStatusVisual(orden.estado);
 
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: [
         const SizedBox(height: 8),
         Icon(
-          exito
-              ? Icons.check_circle_outline
-              : pendiente
-                  ? Icons.hourglass_empty_outlined
-                  : Icons.cancel_outlined,
+          visual.icon,
           size: 64,
-          color: exito
-              ? AppColors.success
-              : pendiente
-                  ? AppColors.warning
-                  : AppColors.danger,
+          color: visual.color,
         ),
         const SizedBox(height: 16),
         Text(
@@ -331,12 +325,16 @@ class _ResultadoPagoContent extends StatelessWidget {
         const SizedBox(height: 12),
         _InfoRow(
             label: 'Estado',
-            valor: orden.estado,
-            color: exito
-                ? AppColors.success
-                : pendiente
-                    ? AppColors.warning
-                    : AppColors.danger),
+            valor: visual.label,
+            color: visual.color),
+        Padding(
+          padding: const EdgeInsets.only(bottom: 6),
+          child: Text(
+            visual.description,
+            style: const TextStyle(fontSize: 12, color: AppColors.textSecondary),
+            textAlign: TextAlign.center,
+          ),
+        ),
         _InfoRow(label: 'Orden #', valor: orden.ordenId.toString()),
         _InfoRow(
             label: 'Total',
