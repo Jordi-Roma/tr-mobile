@@ -11,6 +11,7 @@ import '../../widgets/custom_text_field.dart';
 import '../auth/login_screen.dart';
 import '../delivery/historial_delivery_screen.dart';
 import '../pagos/historial_pagos_screen.dart';
+import '../pagos/devoluciones_screen.dart';
 import 'proveedor_panel_screen.dart';
 
 class PerfilScreen extends StatefulWidget {
@@ -509,6 +510,20 @@ class _PerfilScreenState extends State<PerfilScreen> {
                         );
                       },
                     ),
+                    if (roles.contains('CLIENTE')) ...[
+                      const Divider(),
+                      ListTile(
+                        leading: const Icon(Icons.assignment_return_outlined, color: AppColors.primary),
+                        title: const Text('Mis devoluciones'),
+                        subtitle: const Text('Solicita una devolución y consulta su estado'),
+                        trailing: const Icon(Icons.chevron_right),
+                        onTap: () {
+                          Navigator.of(context).push(
+                            MaterialPageRoute(builder: (_) => const DevolucionesScreen()),
+                          );
+                        },
+                      ),
+                    ],
                     const Divider(),
                     ListTile(
                       leading: const Icon(Icons.local_shipping_outlined, color: AppColors.primary),

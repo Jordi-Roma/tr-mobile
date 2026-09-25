@@ -109,6 +109,13 @@ class ApiConstants {
   static String get pagosHistorial => '$baseUrl/pagos';
   static String pagoDetalleAdmin(int ordenId) => '$baseUrl/pagos/$ordenId';
 
+  // Devoluciones (módulo existente de ventas e inventario)
+  static String get devolucionesVentasElegibles => '$baseUrl/devoluciones/ventas-elegibles';
+  static String get misDevoluciones => '$baseUrl/devoluciones/mis-devoluciones';
+  static String misDevolucionesDetalle(int id) => '$baseUrl/devoluciones/mis-devoluciones/$id';
+  static String cancelarMiDevolucion(int id) => '$baseUrl/devoluciones/mis-devoluciones/$id/cancelar';
+  static String solicitarDevolucion(int ventaId) => '$baseUrl/devoluciones/ventas/$ventaId';
+
   // Endpoints Delivery
   static String get misDeliveries => '$baseUrl/delivery/mis-deliveries';
   static String get deliveryCotizar => '$baseUrl/delivery/cotizar';
