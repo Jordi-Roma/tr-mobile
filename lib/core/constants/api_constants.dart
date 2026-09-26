@@ -100,8 +100,10 @@ class ApiConstants {
   static String adminVarianteActivar(int id) => '$baseUrl/variantes/$id/activar';
   static String adminVariantePrecios(int id) => '$baseUrl/variantes/$id/precios';
 
-  // Endpoints Pagos Stripe
+  // Endpoints Pagos QR y Stripe
   static String get pagoStripeCheckout => '$baseUrl/pagos/stripe/checkout';
+  static String get pagoQrCheckout => '$baseUrl/pagos/qr/checkout';
+  static String pagoQrConfirmar(int ordenId) => '$baseUrl/pagos/qr/confirmar/$ordenId';
   static String pagoOrden(int ordenId) => '$baseUrl/pagos/orden/$ordenId';
   static String pagoConfirmarPrueba(int ordenId) => '$baseUrl/pagos/stripe/confirmar-prueba/$ordenId';
   static String get misPagos => '$baseUrl/pagos/mis-pagos';
@@ -115,6 +117,12 @@ class ApiConstants {
   static String misDevolucionesDetalle(int id) => '$baseUrl/devoluciones/mis-devoluciones/$id';
   static String cancelarMiDevolucion(int id) => '$baseUrl/devoluciones/mis-devoluciones/$id/cancelar';
   static String solicitarDevolucion(int ventaId) => '$baseUrl/devoluciones/ventas/$ventaId';
+  static String get devoluciones => '$baseUrl/devoluciones';
+  static String devolucionDetalle(int id) => '$baseUrl/devoluciones/$id';
+  static String revisarDevolucion(int id) => '$baseUrl/devoluciones/$id/revision';
+  static String recepcionarDevolucion(int id) => '$baseUrl/devoluciones/$id/recepcion';
+  static String reembolsoStripeDevolucion(int id) => '$baseUrl/devoluciones/$id/reembolso';
+  static String reembolsoManualDevolucion(int id) => '$baseUrl/devoluciones/$id/reembolso/manual';
 
   // Endpoints Delivery
   static String get misDeliveries => '$baseUrl/delivery/mis-deliveries';

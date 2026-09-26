@@ -45,6 +45,71 @@ class CheckoutStripeResponse {
   }
 }
 
+class CrearCheckoutQrRequest {
+  final int? sucursalId;
+  final String tipoEntrega;
+  final DeliveryCheckoutRequest? delivery;
+
+  const CrearCheckoutQrRequest({
+    this.sucursalId,
+    this.tipoEntrega = 'RECOJO_SUCURSAL',
+    this.delivery,
+  });
+
+  Map<String, dynamic> toJson() => {
+        if (sucursalId != null) 'sucursal_id': sucursalId,
+        'tipo_entrega': tipoEntrega,
+        if (delivery != null) 'delivery': delivery!.toJson(),
+      };
+}
+
+class CheckoutQrResponse {
+  final int ordenId;
+  final int ventaId;
+  final double montoTotal;
+  final String moneda;
+  final String estado;
+  final String qrPayload;
+  final String alias;
+  final String banco;
+  final String cuenta;
+  final String titular;
+  final String glosa;
+  final String vencimiento;
+
+  const CheckoutQrResponse({
+    required this.ordenId,
+    required this.ventaId,
+    required this.montoTotal,
+    required this.moneda,
+    required this.estado,
+    required this.qrPayload,
+    required this.alias,
+    required this.banco,
+    required this.cuenta,
+    required this.titular,
+    required this.glosa,
+    required this.vencimiento,
+  });
+
+  factory CheckoutQrResponse.fromJson(Map<String, dynamic> json) {
+    return CheckoutQrResponse(
+      ordenId: _asInt(json['orden_id']),
+      ventaId: _asInt(json['venta_id']),
+      montoTotal: _asDouble(json['monto_total']),
+      moneda: json['moneda']?.toString() ?? 'BOB',
+      estado: json['estado']?.toString() ?? '',
+      qrPayload: json['qr_payload']?.toString() ?? '',
+      alias: json['alias']?.toString() ?? 'StyleAR S.R.L.',
+      banco: json['banco']?.toString() ?? 'Banco de Crédito BCP',
+      cuenta: json['cuenta']?.toString() ?? '',
+      titular: json['titular']?.toString() ?? 'StyleAR Bolivia S.R.L.',
+      glosa: json['glosa']?.toString() ?? '',
+      vencimiento: json['vencimiento']?.toString() ?? '',
+    );
+  }
+}
+
 class OrdenPagoResponse {
   final int ordenId;
   final int ventaId;

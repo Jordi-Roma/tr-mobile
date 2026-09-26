@@ -510,12 +510,12 @@ class _PerfilScreenState extends State<PerfilScreen> {
                         );
                       },
                     ),
-                    if (roles.contains('CLIENTE')) ...[
+                    if (roles.contains('CLIENTE') || auth.esAdminOEncargado || roles.contains('CAJERO')) ...[
                       const Divider(),
                       ListTile(
                         leading: const Icon(Icons.assignment_return_outlined, color: AppColors.primary),
-                        title: const Text('Mis devoluciones'),
-                        subtitle: const Text('Solicita una devolución y consulta su estado'),
+                        title: Text(auth.esAdminOEncargado || roles.contains('CAJERO') ? 'Gestión de devoluciones' : 'Mis devoluciones'),
+                        subtitle: Text(auth.esAdminOEncargado || roles.contains('CAJERO') ? 'Revisa solicitudes, recepción e inspección y reembolsos' : 'Solicita una devolución y consulta su estado'),
                         trailing: const Icon(Icons.chevron_right),
                         onTap: () {
                           Navigator.of(context).push(

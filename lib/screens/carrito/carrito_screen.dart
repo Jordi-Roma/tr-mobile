@@ -16,6 +16,7 @@ import '../../widgets/custom_button.dart';
 import '../../widgets/empty_state.dart';
 import '../auth/login_screen.dart';
 import 'pago_stripe_screen.dart';
+import 'pago_qr_screen.dart';
 
 class CarritoScreen extends StatefulWidget {
   final VoidCallback? onIrAlCatalogo;
@@ -43,6 +44,7 @@ class _CarritoScreenState extends State<CarritoScreen> {
   bool _cotizandoDelivery = false;
   bool _buscandoUbicacion = false;
   DeliveryCotizacion? _cotizacionDelivery;
+  String _metodoPago = 'QR';
 
   @override
   void initState() {
@@ -310,7 +312,7 @@ class _CarritoScreenState extends State<CarritoScreen> {
     }
   }
 
-  Future<void> _pagarConStripe() async {
+  Future<void> _pagarConQr() async {
     final sucursales = context.read<CarritoProvider>().sucursalesDisponibles;
     final sucursalId = _resolverSucursalActual(sucursales);
 
@@ -323,8 +325,66 @@ class _CarritoScreenState extends State<CarritoScreen> {
       );
       return;
     }
-    if (!_usaDelivery) {
-      await _confirmarReserva();
+
+    setState(() => _procesandoPago = true);
+
+    try {
+      final delivery = _deliveryRequest(exigirCotizacion: true);
+      if (_usaDelivery && delivery == null) {
+        throw ApiException('Completa y cotiza el delivery antes de pagar.');
+      }
+
+      final checkout = await PagoService.crearCheckoutQr(
+        sucursalId: sucursalId,
+        tipoEntrega: _usaDelivery ? 'DELIVERY' : 'RECOJO_SUCURSAL',
+        delivery: delivery,
+      );
+
+      if (!mounted) return;
+
+      final orden = await Navigator.of(context).push<dynamic>(
+        MaterialPageRoute(
+          builder: (_) => PagoQrScreen(checkout: checkout),
+        ),
+      );
+
+      if (mounted && orden != null) {
+        context.read<CarritoProvider>().cargarCarrito();
+      }
+    } on ApiException catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(e.message),
+          backgroundColor: AppColors.danger,
+          duration: const Duration(seconds: 3),
+        ),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Error al generar el QR de pago: $e'),
+          backgroundColor: AppColors.danger,
+          duration: const Duration(seconds: 4),
+        ),
+      );
+    } finally {
+      if (mounted) setState(() => _procesandoPago = false);
+    }
+  }
+
+  Future<void> _pagarConStripe() async {
+    final sucursales = context.read<CarritoProvider>().sucursalesDisponibles;
+    final sucursalId = _resolverSucursalActual(sucursales);
+
+    if (sucursalId == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('No hay una sucursal con stock suficiente para pagar este carrito.'),
+          backgroundColor: AppColors.danger,
+        ),
+      );
       return;
     }
 
@@ -895,40 +955,152 @@ class _CarritoScreenState extends State<CarritoScreen> {
                   ),
                   const SizedBox(height: 16),
 
-                  // Botón de Reserva
-                  if (!_usaDelivery) ...[
-                    CustomButton(
-                      text: 'Confirmar reserva',
-                      icon: Icons.calendar_today_outlined,
-                      onPressed: puedeConfirmar ? _confirmarReserva : null,
-                    ),
-                  ] else ...[
-                    _procesandoPago
-                        ? const Center(
-                            child: Padding(
-                              padding: EdgeInsets.symmetric(vertical: 6),
-                              child: CircularProgressIndicator(color: AppColors.accent),
+                  // Selector de Método de Pago
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text(
+                        'MÉTODO DE PAGO:',
+                        style: TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w800,
+                          letterSpacing: 0.6,
+                          color: AppColors.textSecondary,
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: _buildMetodoPagoChip(
+                              label: 'QR Simple',
+                              icon: Icons.qr_code_2,
+                              selected: _metodoPago == 'QR',
+                              onTap: () => setState(() => _metodoPago = 'QR'),
                             ),
-                          )
-                        : OutlinedButton.icon(
-                            style: OutlinedButton.styleFrom(
-                              minimumSize: const Size.fromHeight(48),
-                              side: const BorderSide(color: Color(0xFF635BFF), width: 1.5),
-                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                          ),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: _buildMetodoPagoChip(
+                              label: 'Tarjeta Stripe',
+                              icon: Icons.credit_card,
+                              selected: _metodoPago == 'STRIPE',
+                              onTap: () => setState(() => _metodoPago = 'STRIPE'),
                             ),
-                            icon: const Icon(Icons.credit_card, color: Color(0xFF635BFF)),
-                            label: const Text(
-                              'Pagar delivery con Stripe',
-                              style: TextStyle(
-                                color: Color(0xFF635BFF),
-                                fontWeight: FontWeight.w600,
+                          ),
+                          if (!_usaDelivery) ...[
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: _buildMetodoPagoChip(
+                                label: 'En tienda',
+                                icon: Icons.storefront_outlined,
+                                selected: _metodoPago == 'RESERVA',
+                                onTap: () => setState(() => _metodoPago = 'RESERVA'),
                               ),
                             ),
-                            onPressed: puedeConfirmar ? _pagarConStripe : null,
-                          ),
-                  ],
+                          ],
+                        ],
+                      ),
                     ],
                   ),
+                  const SizedBox(height: 16),
+
+                  // Botones de Acción según método
+                  if (_procesandoPago)
+                    const Center(
+                      child: Padding(
+                        padding: EdgeInsets.symmetric(vertical: 8),
+                        child: CircularProgressIndicator(color: AppColors.accent),
+                      ),
+                    )
+                  else if (_metodoPago == 'RESERVA' && !_usaDelivery)
+                    CustomButton(
+                      text: 'Confirmar reserva (pagar en tienda)',
+                      icon: Icons.calendar_today_outlined,
+                      onPressed: puedeConfirmar ? _confirmarReserva : null,
+                    )
+                  else if (_metodoPago == 'QR')
+                    ElevatedButton.icon(
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color(0xFF16A34A),
+                        foregroundColor: Colors.white,
+                        minimumSize: const Size.fromHeight(50),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                        elevation: 1,
+                      ),
+                      icon: const Icon(Icons.qr_code_2, color: Colors.white, size: 22),
+                      label: Text(
+                        'Pagar con QR Simple (${currencyFormat.format(_usaDelivery ? totalConDelivery : carrito.totalMonto)})',
+                        style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 15),
+                      ),
+                      onPressed: puedeConfirmar ? _pagarConQr : null,
+                    )
+                  else
+                    OutlinedButton.icon(
+                      style: OutlinedButton.styleFrom(
+                        minimumSize: const Size.fromHeight(50),
+                        side: const BorderSide(color: Color(0xFF635BFF), width: 1.5),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                      ),
+                      icon: const Icon(Icons.credit_card, color: Color(0xFF635BFF)),
+                      label: Text(
+                        'Pagar con Stripe (${currencyFormat.format(_usaDelivery ? totalConDelivery : carrito.totalMonto)})',
+                        style: const TextStyle(
+                          color: Color(0xFF635BFF),
+                          fontWeight: FontWeight.w700,
+                          fontSize: 15,
+                        ),
+                      ),
+                      onPressed: puedeConfirmar ? _pagarConStripe : null,
+                    ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildMetodoPagoChip({
+    required String label,
+    required IconData icon,
+    required bool selected,
+    required VoidCallback onTap,
+  }) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(12),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 200),
+        padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 6),
+        decoration: BoxDecoration(
+          color: selected ? AppColors.primary.withValues(alpha: 0.08) : Colors.white,
+          border: Border.all(
+            color: selected ? AppColors.primary : const Color(0xFFE2E8F0),
+            width: selected ? 2 : 1,
+          ),
+          borderRadius: BorderRadius.circular(12),
+        ),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(
+              icon,
+              size: 16,
+              color: selected ? AppColors.primary : AppColors.textSecondary,
+            ),
+            const SizedBox(width: 4),
+            Flexible(
+              child: Text(
+                label,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  fontSize: 11,
+                  fontWeight: selected ? FontWeight.w800 : FontWeight.w600,
+                  color: selected ? AppColors.primary : AppColors.textPrimary,
                 ),
               ),
             ),

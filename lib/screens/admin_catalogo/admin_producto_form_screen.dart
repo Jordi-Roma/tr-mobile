@@ -18,6 +18,9 @@ class _AdminProductoFormScreenState extends State<AdminProductoFormScreen> {
   late TextEditingController _nombreCtrl;
   late TextEditingController _descCtrl;
   late TextEditingController _materialCtrl;
+  late TextEditingController _modelo3dUrlCtrl;
+  late TextEditingController _anchoBaseCtrl;
+  late TextEditingController _largoBaseCtrl;
   final TextEditingController _imagenUrlCtrl = TextEditingController();
 
   int? _categoriaId;
@@ -43,6 +46,9 @@ class _AdminProductoFormScreenState extends State<AdminProductoFormScreen> {
     _nombreCtrl = TextEditingController(text: p?.nombre ?? '');
     _descCtrl = TextEditingController(text: p?.descripcion ?? '');
     _materialCtrl = TextEditingController(text: p?.material ?? '');
+    _modelo3dUrlCtrl = TextEditingController(text: p?.modelo3dUrl ?? '');
+    _anchoBaseCtrl = TextEditingController(text: (p?.anchoBaseCm ?? 53.0).toString());
+    _largoBaseCtrl = TextEditingController(text: (p?.largoBaseCm ?? 72.0).toString());
 
     _categoriaId = p?.categoriaId;
     _marcaId = p?.marcaId;
@@ -59,6 +65,9 @@ class _AdminProductoFormScreenState extends State<AdminProductoFormScreen> {
     _nombreCtrl.dispose();
     _descCtrl.dispose();
     _materialCtrl.dispose();
+    _modelo3dUrlCtrl.dispose();
+    _anchoBaseCtrl.dispose();
+    _largoBaseCtrl.dispose();
     _imagenUrlCtrl.dispose();
     super.dispose();
   }
@@ -132,6 +141,16 @@ class _AdminProductoFormScreenState extends State<AdminProductoFormScreen> {
   }
 
   Future<void> _guardar() async {
+    // Si el usuario escribió o pegó una URL de imagen y no presionó "Añadir", agregarla automáticamente
+    final urlPendiente = _imagenUrlCtrl.text.trim();
+    if (urlPendiente.isNotEmpty) {
+      _imagenes.add(AdminProductoImagen(
+        url: urlPendiente,
+        esPrincipal: _imagenes.isEmpty,
+      ));
+      _imagenUrlCtrl.clear();
+    }
+
     if (!_formKey.currentState!.validate()) return;
     if (_categoriaId == null) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -146,6 +165,10 @@ class _AdminProductoFormScreenState extends State<AdminProductoFormScreen> {
     });
 
     try {
+      final ancho = double.tryParse(_anchoBaseCtrl.text.trim()) ?? 53.0;
+      final largo = double.tryParse(_largoBaseCtrl.text.trim()) ?? 72.0;
+      final modelo3d = _modelo3dUrlCtrl.text.trim().isNotEmpty ? _modelo3dUrlCtrl.text.trim() : null;
+
       if (_esEdicion) {
         await AdminCatalogoService.actualizarProducto(
           id: widget.producto!.id,
@@ -157,10 +180,11 @@ class _AdminProductoFormScreenState extends State<AdminProductoFormScreen> {
           genero: _genero,
           tipoPrenda: _tipoPrenda,
           tipoCorte: _tipoCorte,
-          anchoBaseCm: widget.producto!.anchoBaseCm,
-          largoBaseCm: widget.producto!.largoBaseCm,
-          coleccionesIds: widget.producto!.coleccionesIds,
-          proveedoresIds: widget.producto!.proveedoresIds,
+          anchoBaseCm: ancho,
+          largoBaseCm: largo,
+          modelo3dUrl: modelo3d,
+          coleccionesIds: widget.producto?.coleccionesIds ?? const [],
+          proveedoresIds: widget.producto?.proveedoresIds ?? const [],
           imagenes: _imagenes,
         );
       } else {
@@ -173,6 +197,11 @@ class _AdminProductoFormScreenState extends State<AdminProductoFormScreen> {
           genero: _genero,
           tipoPrenda: _tipoPrenda,
           tipoCorte: _tipoCorte,
+          anchoBaseCm: ancho,
+          largoBaseCm: largo,
+          modelo3dUrl: modelo3d,
+          coleccionesIds: const [],
+          proveedoresIds: const [],
           imagenes: _imagenes,
         );
       }
@@ -418,6 +447,51 @@ class _AdminProductoFormScreenState extends State<AdminProductoFormScreen> {
                         }),
                         const SizedBox(height: 10),
 
+                        const SizedBox(height: 14),
+
+                        TextFormField(
+                          controller: _modelo3dUrlCtrl,
+                          decoration: const InputDecoration(
+                            labelText: 'URL Modelo 3D (.glb)',
+                            hintText: 'https://.../modelo.glb o ruta estática',
+                            border: OutlineInputBorder(),
+                            prefixIcon: Icon(Icons.view_in_ar),
+                            isDense: true,
+                          ),
+                        ),
+                        const SizedBox(height: 14),
+
+                        Row(
+                          children: [
+                            Expanded(
+                              child: TextFormField(
+                                controller: _anchoBaseCtrl,
+                                keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                                decoration: const InputDecoration(
+                                  labelText: 'Ancho Base (cm)',
+                                  hintText: '53.0',
+                                  border: OutlineInputBorder(),
+                                  isDense: true,
+                                ),
+                              ),
+                            ),
+                            const SizedBox(width: 10),
+                            Expanded(
+                              child: TextFormField(
+                                controller: _largoBaseCtrl,
+                                keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                                decoration: const InputDecoration(
+                                  labelText: 'Largo Base (cm)',
+                                  hintText: '72.0',
+                                  border: OutlineInputBorder(),
+                                  isDense: true,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 12),
+
                         Container(
                           padding: const EdgeInsets.all(10),
                           decoration: BoxDecoration(
@@ -431,7 +505,7 @@ class _AdminProductoFormScreenState extends State<AdminProductoFormScreen> {
                               const SizedBox(width: 8),
                               const Expanded(
                                 child: Text(
-                                  'Las medidas exactas en cm se definen y ajustan al crear o editar cada variante de talla individualmente.',
+                                  'Las medidas exactas por talla se definen en cada variante. Estas son las proporciones base estándar del catálogo.',
                                   style: TextStyle(fontSize: 12, color: Color(0xFF1E3A8A)),
                                 ),
                               ),
@@ -448,6 +522,11 @@ class _AdminProductoFormScreenState extends State<AdminProductoFormScreen> {
                       title: 'Imágenes del Producto',
                       icon: Icons.photo_library_outlined,
                       children: [
+                        const Text(
+                          'Pega la URL de la imagen y presiona "Añadir" (o presiona Guardar directamente si sólo tienes una).',
+                          style: TextStyle(fontSize: 12, color: AppColors.textSecondary),
+                        ),
+                        const SizedBox(height: 10),
                         Row(
                           children: [
                             Expanded(
@@ -455,9 +534,10 @@ class _AdminProductoFormScreenState extends State<AdminProductoFormScreen> {
                                 controller: _imagenUrlCtrl,
                                 decoration: const InputDecoration(
                                   labelText: 'URL de Imagen',
-                                  hintText: 'https://...',
+                                  hintText: 'https://images.unsplash.com/...',
                                   border: OutlineInputBorder(),
                                   isDense: true,
+                                  prefixIcon: Icon(Icons.link),
                                 ),
                               ),
                             ),
@@ -501,17 +581,26 @@ class _AdminProductoFormScreenState extends State<AdminProductoFormScreen> {
                                 return Stack(
                                   children: [
                                     Container(
-                                      width: 90,
+                                      width: 95,
                                       height: 120,
                                       decoration: BoxDecoration(
                                         borderRadius: BorderRadius.circular(8),
                                         border: Border.all(
                                           color: img.esPrincipal ? AppColors.primary : Colors.grey.shade300,
-                                          width: img.esPrincipal ? 2 : 1,
+                                          width: img.esPrincipal ? 2.5 : 1,
                                         ),
-                                        image: DecorationImage(
-                                          image: NetworkImage(img.url),
+                                      ),
+                                      child: ClipRRect(
+                                        borderRadius: BorderRadius.circular(7),
+                                        child: Image.network(
+                                          img.url,
                                           fit: BoxFit.cover,
+                                          errorBuilder: (context, error, stackTrace) => Container(
+                                            color: Colors.grey.shade200,
+                                            child: const Center(
+                                              child: Icon(Icons.broken_image, color: Colors.grey, size: 28),
+                                            ),
+                                          ),
                                         ),
                                       ),
                                     ),
@@ -523,7 +612,7 @@ class _AdminProductoFormScreenState extends State<AdminProductoFormScreen> {
                                         child: Container(
                                           padding: const EdgeInsets.all(4),
                                           decoration: BoxDecoration(
-                                            color: Colors.black54,
+                                            color: img.esPrincipal ? AppColors.primary : Colors.black54,
                                             shape: BoxShape.circle,
                                           ),
                                           child: Icon(
@@ -561,13 +650,17 @@ class _AdminProductoFormScreenState extends State<AdminProductoFormScreen> {
                                         child: Container(
                                           padding: const EdgeInsets.symmetric(vertical: 2),
                                           decoration: BoxDecoration(
-                                            color: AppColors.primary,
+                                            color: AppColors.primary.withValues(alpha: 0.9),
                                             borderRadius: BorderRadius.circular(4),
                                           ),
                                           child: const Text(
-                                            'Principal',
+                                            'PRINCIPAL',
                                             textAlign: TextAlign.center,
-                                            style: TextStyle(color: Colors.white, fontSize: 9, fontWeight: FontWeight.bold),
+                                            style: TextStyle(
+                                              color: Colors.white,
+                                              fontSize: 9,
+                                              fontWeight: FontWeight.bold,
+                                            ),
                                           ),
                                         ),
                                       ),

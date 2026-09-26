@@ -37,11 +37,16 @@ class _LoginScreenState extends State<LoginScreen> {
     );
 
     if (success && mounted) {
-      context.read<CarritoProvider>().limpiarCarrito();
-      context.read<FavoritosProvider>().limpiar();
-      await context.read<CarritoProvider>().cargarCarrito();
-      await context.read<FavoritosProvider>().cargarFavoritos();
-      Navigator.of(context).pop(); // Cierra login si fue abierto modalmente
+      final nav = Navigator.of(context);
+      final carrito = context.read<CarritoProvider>();
+      final favoritos = context.read<FavoritosProvider>();
+      carrito.limpiarCarrito();
+      favoritos.limpiar();
+      await carrito.cargarCarrito();
+      await favoritos.cargarFavoritos();
+      if (mounted) {
+        nav.pop(); // Cierra login si fue abierto modalmente
+      }
     }
   }
 

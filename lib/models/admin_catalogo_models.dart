@@ -39,6 +39,7 @@ class AdminProductoItem {
   final String tipoCorte;
   final double? anchoBaseCm;
   final double? largoBaseCm;
+  final String? modelo3dUrl;
   final bool activo;
   final List<int> coleccionesIds;
   final List<int> proveedoresIds;
@@ -58,6 +59,7 @@ class AdminProductoItem {
     this.tipoCorte = 'REGULAR_FIT',
     this.anchoBaseCm,
     this.largoBaseCm,
+    this.modelo3dUrl,
     required this.activo,
     required this.coleccionesIds,
     required this.proveedoresIds,
@@ -85,6 +87,7 @@ class AdminProductoItem {
       tipoCorte: json['tipo_corte'] ?? 'REGULAR_FIT',
       anchoBaseCm: json['ancho_base_cm'] != null ? double.tryParse(json['ancho_base_cm'].toString()) : null,
       largoBaseCm: json['largo_base_cm'] != null ? double.tryParse(json['largo_base_cm'].toString()) : null,
+      modelo3dUrl: json['modelo_3d_url'],
       activo: json['activo'] ?? true,
       coleccionesIds: (json['colecciones_ids'] as List<dynamic>?)?.map((e) => int.parse(e.toString())).toList() ?? [],
       proveedoresIds: (json['proveedores_ids'] as List<dynamic>?)?.map((e) => int.parse(e.toString())).toList() ?? [],

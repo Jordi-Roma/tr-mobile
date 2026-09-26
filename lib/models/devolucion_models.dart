@@ -94,41 +94,71 @@ class DevolucionDetalle {
 class Devolucion {
   final int id;
   final String codigo;
+  final int ventaId;
   final String ventaCodigo;
+  final String? clienteNombre;
+  final String? clienteCorreo;
+  final String sucursal;
   final String estado;
   final String motivo;
+  final String? observacion;
   final double montoSolicitado;
   final double montoAprobado;
-  final String fechaSolicitud;
+  final String? metodoPagoOriginal;
+  final String? proveedorPagoOriginal;
   final String? metodoReembolso;
   final String? referenciaReembolso;
+  final String fechaSolicitud;
+  final String? fechaRevision;
+  final String? fechaRecepcion;
+  final String? fechaReembolso;
   final List<DevolucionDetalle> detalles;
 
   const Devolucion({
     required this.id,
     required this.codigo,
+    this.ventaId = 0,
     required this.ventaCodigo,
+    this.clienteNombre,
+    this.clienteCorreo,
+    this.sucursal = '',
     required this.estado,
     required this.motivo,
+    this.observacion,
     required this.montoSolicitado,
     required this.montoAprobado,
-    required this.fechaSolicitud,
+    this.metodoPagoOriginal,
+    this.proveedorPagoOriginal,
     this.metodoReembolso,
     this.referenciaReembolso,
+    required this.fechaSolicitud,
+    this.fechaRevision,
+    this.fechaRecepcion,
+    this.fechaReembolso,
     required this.detalles,
   });
 
   factory Devolucion.fromJson(Map<String, dynamic> json) => Devolucion(
         id: _int(json['id']),
         codigo: json['codigo']?.toString() ?? '',
+        ventaId: _int(json['venta_id']),
         ventaCodigo: json['venta_codigo']?.toString() ?? '',
+        clienteNombre: json['cliente_nombre']?.toString(),
+        clienteCorreo: json['cliente_correo']?.toString(),
+        sucursal: json['sucursal']?.toString() ?? '',
         estado: json['estado']?.toString() ?? '',
         motivo: json['motivo']?.toString() ?? '',
+        observacion: json['observacion']?.toString(),
         montoSolicitado: _double(json['monto_solicitado']),
         montoAprobado: _double(json['monto_aprobado']),
-        fechaSolicitud: json['fecha_solicitud']?.toString() ?? '',
+        metodoPagoOriginal: json['metodo_pago_original']?.toString(),
+        proveedorPagoOriginal: json['proveedor_pago_original']?.toString(),
         metodoReembolso: json['metodo_reembolso']?.toString(),
         referenciaReembolso: json['referencia_reembolso']?.toString(),
+        fechaSolicitud: json['fecha_solicitud']?.toString() ?? '',
+        fechaRevision: json['fecha_revision']?.toString(),
+        fechaRecepcion: json['fecha_recepcion']?.toString(),
+        fechaReembolso: json['fecha_reembolso']?.toString(),
         detalles: (json['detalles'] as List<dynamic>? ?? [])
             .whereType<Map<String, dynamic>>()
             .map(DevolucionDetalle.fromJson)

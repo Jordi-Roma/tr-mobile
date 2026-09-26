@@ -22,6 +22,27 @@ class PagoService {
     return CheckoutStripeResponse.fromJson(res as Map<String, dynamic>);
   }
 
+  /// Crea una orden de pago con QR Simple para Bolivia.
+  static Future<CheckoutQrResponse> crearCheckoutQr({
+    int? sucursalId,
+    String tipoEntrega = 'RECOJO_SUCURSAL',
+    DeliveryCheckoutRequest? delivery,
+  }) async {
+    final body = CrearCheckoutQrRequest(
+      sucursalId: sucursalId,
+      tipoEntrega: tipoEntrega,
+      delivery: delivery,
+    ).toJson();
+    final res = await ApiClient.post(ApiConstants.pagoQrCheckout, body: body);
+    return CheckoutQrResponse.fromJson(res as Map<String, dynamic>);
+  }
+
+  /// Confirma un pago QR una vez que el cliente realizó la transferencia.
+  static Future<OrdenPagoResponse> confirmarPagoQr(int ordenId) async {
+    final res = await ApiClient.post(ApiConstants.pagoQrConfirmar(ordenId), body: {});
+    return OrdenPagoResponse.fromJson(res as Map<String, dynamic>);
+  }
+
   /// Obtiene el estado actual de una orden de pago.
   static Future<OrdenPagoResponse> obtenerOrden(int ordenId) async {
     final res = await ApiClient.get(ApiConstants.pagoOrden(ordenId));

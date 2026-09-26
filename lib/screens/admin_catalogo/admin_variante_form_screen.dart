@@ -31,6 +31,9 @@ class _AdminVarianteFormScreenState extends State<AdminVarianteFormScreen> {
   List<AdminColor> _colores = [];
   List<AdminPrecioItem> _precios = [];
 
+  DateTime? _fechaInicio = DateTime.now();
+  DateTime? _fechaFin;
+
   bool _cargandoInicial = true;
   bool _guardando = false;
   bool _guardandoPrecio = false;
@@ -177,6 +180,50 @@ class _AdminVarianteFormScreenState extends State<AdminVarianteFormScreen> {
     }
   }
 
+  Future<void> _seleccionarFechaInicio() async {
+    final seleccionada = await showDatePicker(
+      context: context,
+      initialDate: _fechaInicio ?? DateTime.now(),
+      firstDate: DateTime(2020),
+      lastDate: DateTime(2035),
+    );
+    if (seleccionada != null) {
+      setState(() => _fechaInicio = seleccionada);
+    }
+  }
+
+  Future<void> _seleccionarFechaFin() async {
+    final seleccionada = await showDatePicker(
+      context: context,
+      initialDate: _fechaFin ?? (_fechaInicio ?? DateTime.now()).add(const Duration(days: 30)),
+      firstDate: _fechaInicio ?? DateTime(2020),
+      lastDate: DateTime(2035),
+    );
+    if (seleccionada != null) {
+      setState(() => _fechaFin = seleccionada);
+    }
+  }
+
+  String _formatFecha(String? f) {
+    if (f == null || f.trim().isEmpty) return '—';
+    try {
+      final clean = f.split('T').first;
+      final partes = clean.split('-');
+      if (partes.length == 3) {
+        return '${partes[2]}/${partes[1]}/${partes[0]}';
+      }
+      final d = DateTime.parse(f);
+      return '${d.day.toString().padLeft(2, '0')}/${d.month.toString().padLeft(2, '0')}/${d.year}';
+    } catch (_) {
+      return f;
+    }
+  }
+
+  String _formatDateShort(DateTime? d) {
+    if (d == null) return 'Indefinida';
+    return '${d.day.toString().padLeft(2, '0')}/${d.month.toString().padLeft(2, '0')}/${d.year}';
+  }
+
   Future<void> _asignarPrecio() async {
     if (!_precioFormKey.currentState!.validate()) return;
     if (widget.variante == null) return;
@@ -187,24 +234,39 @@ class _AdminVarianteFormScreenState extends State<AdminVarianteFormScreen> {
       return;
     }
 
+    if (_fechaFin != null && _fechaInicio != null && _fechaFin!.isBefore(_fechaInicio!)) {
+      setState(() => _errorPrecio = 'La fecha fin no puede ser anterior a la fecha de inicio');
+      return;
+    }
+
     setState(() {
       _guardandoPrecio = true;
       _errorPrecio = null;
     });
 
     try {
+      final inicioStr = _fechaInicio != null
+          ? '${_fechaInicio!.year}-${_fechaInicio!.month.toString().padLeft(2, '0')}-${_fechaInicio!.day.toString().padLeft(2, '0')}'
+          : null;
+      final finStr = _fechaFin != null
+          ? '${_fechaFin!.year}-${_fechaFin!.month.toString().padLeft(2, '0')}-${_fechaFin!.day.toString().padLeft(2, '0')}'
+          : null;
+
       final res = await AdminCatalogoService.asignarPrecio(
         varianteId: widget.variante!.id,
         monto: monto,
+        fechaInicio: inicioStr,
+        fechaFin: finStr,
       );
       if (mounted) {
         setState(() {
           _precios = res.precios;
           _precioMontoCtrl.clear();
+          _fechaFin = null;
           _guardandoPrecio = false;
         });
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Nuevo precio vigente asignado'), backgroundColor: Colors.green),
+          const SnackBar(content: Text('Nuevo precio vigente asignado con éxito'), backgroundColor: Colors.green),
         );
       }
     } catch (e) {
@@ -477,46 +539,118 @@ class _AdminVarianteFormScreenState extends State<AdminVarianteFormScreen> {
                                 child: Text(_errorPrecio!, style: const TextStyle(color: Colors.red, fontSize: 12)),
                               ),
 
+                            TextFormField(
+                              controller: _precioMontoCtrl,
+                              keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                              decoration: const InputDecoration(
+                                labelText: 'Monto (Bs.) *',
+                                hintText: 'Ej: 150.00',
+                                prefixText: 'Bs. ',
+                                border: OutlineInputBorder(),
+                                isDense: true,
+                              ),
+                              validator: (v) => (v == null || v.trim().isEmpty) ? 'Requerido' : null,
+                            ),
+                            const SizedBox(height: 12),
+
                             Row(
                               children: [
                                 Expanded(
-                                  child: TextFormField(
-                                    controller: _precioMontoCtrl,
-                                    keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                                    decoration: const InputDecoration(
-                                      labelText: 'Monto (Bs.) *',
-                                      hintText: '120.00',
-                                      border: OutlineInputBorder(),
-                                      isDense: true,
+                                  child: InkWell(
+                                    onTap: _seleccionarFechaInicio,
+                                    borderRadius: BorderRadius.circular(8),
+                                    child: InputDecorator(
+                                      decoration: const InputDecoration(
+                                        labelText: 'Fecha Inicio',
+                                        border: OutlineInputBorder(),
+                                        isDense: true,
+                                        suffixIcon: Icon(Icons.calendar_today, size: 18),
+                                      ),
+                                      child: Text(
+                                        _formatDateShort(_fechaInicio),
+                                        style: const TextStyle(fontSize: 13),
+                                      ),
                                     ),
-                                    validator: (v) => (v == null || v.trim().isEmpty) ? 'Requerido' : null,
                                   ),
                                 ),
                                 const SizedBox(width: 10),
-                                ElevatedButton.icon(
-                                  onPressed: _guardandoPrecio ? null : _asignarPrecio,
-                                  icon: const Icon(Icons.attach_money, size: 18),
-                                  label: const Text('Fijar Precio'),
-                                  style: ElevatedButton.styleFrom(
-                                    backgroundColor: Colors.green.shade700,
-                                    foregroundColor: Colors.white,
-                                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                                Expanded(
+                                  child: InkWell(
+                                    onTap: _seleccionarFechaFin,
+                                    borderRadius: BorderRadius.circular(8),
+                                    child: InputDecorator(
+                                      decoration: InputDecoration(
+                                        labelText: 'Fecha Fin',
+                                        hintText: 'Indefinida',
+                                        border: const OutlineInputBorder(),
+                                        isDense: true,
+                                        suffixIcon: _fechaFin != null
+                                            ? IconButton(
+                                                icon: const Icon(Icons.clear, size: 16),
+                                                padding: EdgeInsets.zero,
+                                                constraints: const BoxConstraints(),
+                                                onPressed: () => setState(() => _fechaFin = null),
+                                              )
+                                            : const Icon(Icons.event, size: 18),
+                                      ),
+                                      child: Text(
+                                        _fechaFin != null ? _formatDateShort(_fechaFin) : 'Indefinida',
+                                        style: TextStyle(
+                                          fontSize: 13,
+                                          color: _fechaFin != null ? Colors.black87 : Colors.grey.shade600,
+                                        ),
+                                      ),
+                                    ),
                                   ),
                                 ),
                               ],
                             ),
-                            const SizedBox(height: 16),
+                            const SizedBox(height: 14),
 
-                            const Text(
-                              'Historial de Precios:',
-                              style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13),
+                            SizedBox(
+                              width: double.infinity,
+                              child: ElevatedButton.icon(
+                                onPressed: _guardandoPrecio ? null : _asignarPrecio,
+                                icon: _guardandoPrecio
+                                    ? const SizedBox(height: 16, width: 16, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
+                                    : const Icon(Icons.add_circle_outline, size: 18),
+                                label: Text(_guardandoPrecio ? 'Asignando Precio...' : 'Añadir / Asignar Precio'),
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: Colors.green.shade700,
+                                  foregroundColor: Colors.white,
+                                  padding: const EdgeInsets.symmetric(vertical: 13),
+                                ),
+                              ),
+                            ),
+                            const SizedBox(height: 20),
+
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
+                                const Text(
+                                  'Historial de Precios:',
+                                  style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13),
+                                ),
+                                Text(
+                                  '${_precios.length} registrados',
+                                  style: TextStyle(fontSize: 11, color: Colors.grey.shade600),
+                                ),
+                              ],
                             ),
                             const SizedBox(height: 8),
 
                             if (_precios.isEmpty)
-                              const Padding(
-                                padding: EdgeInsets.all(12),
-                                child: Center(child: Text('Sin precios asignados aún', style: TextStyle(color: Colors.grey))),
+                              Container(
+                                padding: const EdgeInsets.all(16),
+                                alignment: Alignment.center,
+                                decoration: BoxDecoration(
+                                  color: Colors.grey.shade50,
+                                  borderRadius: BorderRadius.circular(8),
+                                ),
+                                child: const Text(
+                                  'No hay precios registrados para esta variante.',
+                                  style: TextStyle(color: Colors.grey, fontSize: 12),
+                                ),
                               )
                             else
                               ListView.separated(
@@ -526,35 +660,62 @@ class _AdminVarianteFormScreenState extends State<AdminVarianteFormScreen> {
                                 separatorBuilder: (_, index) => const Divider(height: 1),
                                 itemBuilder: (ctx, idx) {
                                   final pr = _precios[idx];
-                                  final esVigente = idx == 0;
-                                  return ListTile(
-                                    contentPadding: EdgeInsets.zero,
-                                    leading: Icon(
-                                      esVigente ? Icons.verified : Icons.history,
-                                      color: esVigente ? Colors.green.shade700 : Colors.grey,
+                                  final esVigente = pr.activo;
+                                  final vigenciaStr = '${_formatFecha(pr.fechaInicio)} - ${pr.fechaFin != null ? _formatFecha(pr.fechaFin) : 'Indefinido'}';
+                                  return Container(
+                                    padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 8),
+                                    decoration: BoxDecoration(
+                                      color: esVigente ? Colors.green.shade50.withValues(alpha: 0.3) : Colors.transparent,
+                                      borderRadius: BorderRadius.circular(8),
                                     ),
-                                    title: Text(
-                                      'Bs. ${pr.monto.toStringAsFixed(2)}',
-                                      style: TextStyle(
-                                        fontWeight: esVigente ? FontWeight.bold : FontWeight.normal,
-                                        color: esVigente ? Colors.black87 : Colors.grey.shade700,
-                                      ),
-                                    ),
-                                    subtitle: Text(
-                                      esVigente ? 'Precio vigente' : (pr.fechaInicio ?? 'Histórico'),
-                                      style: const TextStyle(fontSize: 11),
-                                    ),
-                                    trailing: esVigente
-                                        ? Container(
-                                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                                            decoration: BoxDecoration(
-                                              color: Colors.green.shade50,
-                                              border: Border.all(color: Colors.green.shade300),
-                                              borderRadius: BorderRadius.circular(12),
+                                    child: Row(
+                                      children: [
+                                        Icon(
+                                          esVigente ? Icons.verified : Icons.history,
+                                          color: esVigente ? Colors.green.shade700 : Colors.grey,
+                                          size: 22,
+                                        ),
+                                        const SizedBox(width: 12),
+                                        Expanded(
+                                          child: Column(
+                                            crossAxisAlignment: CrossAxisAlignment.start,
+                                            children: [
+                                              Text(
+                                                'Bs. ${pr.monto.toStringAsFixed(2)}',
+                                                style: TextStyle(
+                                                  fontWeight: esVigente ? FontWeight.bold : FontWeight.w600,
+                                                  fontSize: 15,
+                                                  color: esVigente ? Colors.black87 : Colors.grey.shade700,
+                                                ),
+                                              ),
+                                              const SizedBox(height: 2),
+                                              Text(
+                                                'Vigencia: $vigenciaStr',
+                                                style: TextStyle(
+                                                  fontSize: 11.5,
+                                                  color: esVigente ? Colors.green.shade900 : Colors.grey.shade600,
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                        ),
+                                        Container(
+                                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                                          decoration: BoxDecoration(
+                                            color: esVigente ? Colors.green.shade100 : Colors.grey.shade200,
+                                            borderRadius: BorderRadius.circular(12),
+                                          ),
+                                          child: Text(
+                                            esVigente ? 'VIGENTE' : 'HISTÓRICO',
+                                            style: TextStyle(
+                                              color: esVigente ? Colors.green.shade800 : Colors.grey.shade700,
+                                              fontSize: 10,
+                                              fontWeight: FontWeight.bold,
                                             ),
-                                            child: Text('ACTIVO', style: TextStyle(color: Colors.green.shade800, fontSize: 10, fontWeight: FontWeight.bold)),
-                                          )
-                                        : null,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
                                   );
                                 },
                               ),

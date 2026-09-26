@@ -21,8 +21,10 @@ class AuthProvider extends ChangeNotifier {
   bool get esCliente => _usuario?.esCliente ?? false;
   bool get esAdmin => _usuario?.esAdmin ?? false;
   bool get esEncargado => _usuario?.esEncargado ?? false;
+  bool get esCajero => _usuario?.esCajero ?? false;
   bool get esProveedor => _usuario?.esProveedor ?? false;
   bool get esAdminOEncargado => _usuario?.esAdminOEncargado ?? false;
+  bool get esPersonalDevoluciones => esAdmin || esEncargado || esCajero;
 
   void limpiarError() {
     _error = null;
