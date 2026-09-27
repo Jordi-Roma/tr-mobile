@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:convert';
 
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
@@ -26,6 +27,7 @@ class _VestidorEnVivoScreenState extends State<VestidorEnVivoScreen> {
   bool _cargandoStream = true;
   bool _permisoDenegado = false;
   String? _errorMensaje;
+  bool _esCamaraTrasera = false;
 
   // Catálogo y prenda activa
   List<Map<String, dynamic>> _prendas = [];
@@ -141,6 +143,23 @@ class _VestidorEnVivoScreenState extends State<VestidorEnVivoScreen> {
       debugPrint('[WebView JS] ${message.level}: ${message.message}');
     });
 
+    controller.addJavaScriptChannel(
+      'FlutterChannel',
+      onMessageReceived: (message) {
+        try {
+          final data = jsonDecode(message.message);
+          if (data['event'] == 'cameraChanged') {
+            final facing = data['facingMode'] as String?;
+            if (mounted) {
+              setState(() {
+                _esCamaraTrasera = (facing == 'environment');
+              });
+            }
+          }
+        } catch (_) {}
+      },
+    );
+
     if (controller.platform is AndroidWebViewController) {
       final android = controller.platform as AndroidWebViewController;
       android.setOnPlatformPermissionRequest((request) {
@@ -190,6 +209,36 @@ class _VestidorEnVivoScreenState extends State<VestidorEnVivoScreen> {
         content: Text('Streaming pausado. Créditos de Decart protegidos.'),
         backgroundColor: Color(0xFFF59E0B),
         duration: Duration(seconds: 2),
+      ),
+    );
+  }
+
+  void _cambiarCamara() {
+    setState(() {
+      _esCamaraTrasera = !_esCamaraTrasera;
+    });
+    _webViewController?.runJavaScript('window.switchCamera()');
+    ScaffoldMessenger.of(context).hideCurrentSnackBar();
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Row(
+          children: [
+            Icon(
+              _esCamaraTrasera ? Icons.camera_rear_rounded : Icons.camera_front_rounded,
+              color: const Color(0xFF0F172A),
+              size: 18,
+            ),
+            const SizedBox(width: 8),
+            Text(
+              _esCamaraTrasera ? 'Cambiando a cámara trasera...' : 'Cambiando a cámara frontal...',
+              style: const TextStyle(color: Color(0xFF0F172A), fontWeight: FontWeight.bold),
+            ),
+          ],
+        ),
+        backgroundColor: const Color(0xFF00E5FF),
+        duration: const Duration(milliseconds: 1400),
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
       ),
     );
   }
@@ -371,6 +420,16 @@ class _VestidorEnVivoScreenState extends State<VestidorEnVivoScreen> {
           ],
         ),
         actions: [
+          // Botón alternar cámara (Frontal / Trasera)
+          IconButton(
+            icon: Icon(
+              _esCamaraTrasera ? Icons.camera_rear_rounded : Icons.camera_front_rounded,
+              color: const Color(0xFF00E5FF),
+              size: 20,
+            ),
+            tooltip: _esCamaraTrasera ? 'Cambiar a cámara frontal' : 'Cambiar a cámara trasera',
+            onPressed: _cambiarCamara,
+          ),
           // Contador de protección de créditos y estado
           GestureDetector(
             onTap: _mostrarInfoCreditos,
@@ -499,47 +558,91 @@ class _VestidorEnVivoScreenState extends State<VestidorEnVivoScreen> {
                         ),
                       ),
 
-                    // 5. Botón Único de Pausar / Reanudar (esquina superior derecha)
+                    // 5. Botones de Control: Cámara y Pausar / Reanudar (esquina superior derecha)
                     Positioned(
                       top: 14,
                       right: 14,
-                      child: GestureDetector(
-                        onTap: _sesionPausada ? _reanudarSesion : _pausarSesion,
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
-                          decoration: BoxDecoration(
-                            color: _sesionPausada
-                                ? const Color(0xFF00E5FF).withValues(alpha: 0.25)
-                                : const Color(0xFFF59E0B).withValues(alpha: 0.25),
-                            borderRadius: BorderRadius.circular(16),
-                            border: Border.all(
-                              color: _sesionPausada ? const Color(0xFF00E5FF) : const Color(0xFFF59E0B),
-                              width: 1.2,
-                            ),
-                            boxShadow: const [
-                              BoxShadow(color: Colors.black45, blurRadius: 8),
-                            ],
-                          ),
-                          child: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Icon(
-                                _sesionPausada ? Icons.play_arrow_rounded : Icons.pause_rounded,
-                                color: _sesionPausada ? const Color(0xFF00E5FF) : const Color(0xFFF59E0B),
-                                size: 16,
-                              ),
-                              const SizedBox(width: 5),
-                              Text(
-                                _sesionPausada ? 'Reanudar' : 'Pausar',
-                                style: TextStyle(
-                                  color: _sesionPausada ? const Color(0xFF00E5FF) : const Color(0xFFF59E0B),
-                                  fontWeight: FontWeight.bold,
-                                  fontSize: 12,
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          // Botón Cambiar Cámara (Frontal / Trasera)
+                          GestureDetector(
+                            onTap: _cambiarCamara,
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFF0F172A).withValues(alpha: 0.85),
+                                borderRadius: BorderRadius.circular(16),
+                                border: Border.all(
+                                  color: const Color(0xFF00E5FF).withValues(alpha: 0.6),
+                                  width: 1.2,
                                 ),
+                                boxShadow: const [
+                                  BoxShadow(color: Colors.black45, blurRadius: 8),
+                                ],
                               ),
-                            ],
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Icon(
+                                    _esCamaraTrasera ? Icons.camera_rear_rounded : Icons.camera_front_rounded,
+                                    color: const Color(0xFF00E5FF),
+                                    size: 16,
+                                  ),
+                                  const SizedBox(width: 5),
+                                  Text(
+                                    _esCamaraTrasera ? 'Trasera' : 'Frontal',
+                                    style: const TextStyle(
+                                      color: Colors.white,
+                                      fontWeight: FontWeight.bold,
+                                      fontSize: 12,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
                           ),
-                        ),
+                          const SizedBox(width: 8),
+                          // Botón Pausar / Reanudar
+                          GestureDetector(
+                            onTap: _sesionPausada ? _reanudarSesion : _pausarSesion,
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+                              decoration: BoxDecoration(
+                                color: _sesionPausada
+                                    ? const Color(0xFF00E5FF).withValues(alpha: 0.25)
+                                    : const Color(0xFFF59E0B).withValues(alpha: 0.25),
+                                borderRadius: BorderRadius.circular(16),
+                                border: Border.all(
+                                  color: _sesionPausada ? const Color(0xFF00E5FF) : const Color(0xFFF59E0B),
+                                  width: 1.2,
+                                ),
+                                boxShadow: const [
+                                  BoxShadow(color: Colors.black45, blurRadius: 8),
+                                ],
+                              ),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Icon(
+                                    _sesionPausada ? Icons.play_arrow_rounded : Icons.pause_rounded,
+                                    color: _sesionPausada ? const Color(0xFF00E5FF) : const Color(0xFFF59E0B),
+                                    size: 16,
+                                  ),
+                                  const SizedBox(width: 5),
+                                  Text(
+                                    _sesionPausada ? 'Reanudar' : 'Pausar',
+                                    style: TextStyle(
+                                      color: _sesionPausada ? const Color(0xFF00E5FF) : const Color(0xFFF59E0B),
+                                      fontWeight: FontWeight.bold,
+                                      fontSize: 12,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ],
                       ),
                     ),
                   ],
