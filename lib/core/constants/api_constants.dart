@@ -24,10 +24,10 @@ class ApiConstants {
 
     switch (defaultTargetPlatform) {
       case TargetPlatform.android:
-        // Túnel público ngrok: conecta directo desde Wi-Fi, datos móviles 4G/5G o punto de acceso sin configurar IP
-        return 'https://impromptu-uncertain-grading.ngrok-free.dev/api/v1';
+        // Despliegue en la nube Railway: acceso global desde cualquier red Wi-Fi o datos móviles
+        return 'https://backend-tr-production.up.railway.app/api/v1';
       default:
-        return 'https://impromptu-uncertain-grading.ngrok-free.dev/api/v1';
+        return 'https://backend-tr-production.up.railway.app/api/v1';
     }
   }
 
