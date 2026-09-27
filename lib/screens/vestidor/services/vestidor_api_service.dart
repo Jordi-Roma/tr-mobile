@@ -82,5 +82,15 @@ class VestidorApiService {
       throw Exception('Error al procesar prueba virtual con IA (${response.statusCode})');
     }
   }
+
+  /// Obtiene un token efímero de sesión para streaming WebRTC en vivo con Decart Lucy VTON
+  static Future<Map<String, dynamic>> obtenerTokenEnVivoDecart({int duracionSegundos = 300}) async {
+    final response = await ApiClient.post(
+      '${ApiConstants.vestidorTokenEnVivo}?duracion_segundos=$duracionSegundos',
+      body: {},
+      withAuth: false,
+    );
+    return response as Map<String, dynamic>;
+  }
 }
 

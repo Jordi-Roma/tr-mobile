@@ -69,6 +69,7 @@ class ApiConstants {
   static String get vestidorPrendasDisponibles => '$baseUrl/catalogo/vestidor/prendas-disponibles';
   static String get vestidorSesion => '$baseUrl/catalogo/vestidor/sesion';
   static String get vestidorProbarIa => '$baseUrl/catalogo/vestidor/probar-ia';
+  static String get vestidorTokenEnVivo => '$baseUrl/catalogo/vestidor/token-en-vivo';
 
   // Endpoints Administración Catálogo  (prefix: /api/v1 sin /administracion)
   static String get adminProductos => '$baseUrl/productos';

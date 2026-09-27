@@ -3,7 +3,6 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
-import 'package:url_launcher/url_launcher.dart';
 
 import '../../core/constants/app_colors.dart';
 import '../../models/catalogo_models.dart';
@@ -20,8 +19,8 @@ import '../../widgets/stock_badge.dart';
 import '../admin_catalogo/admin_producto_form_screen.dart';
 import '../auth/login_screen.dart';
 import '../vestidor/probador_ia_screen.dart';
-import '../vestidor/services/vestidor_api_service.dart';
 import '../vestidor/vestidor_screen.dart';
+import '../vestidor/vestidor_en_vivo_screen.dart';
 
 class ProductoDetalleScreen extends StatefulWidget {
   final int productoId;
@@ -60,100 +59,9 @@ class _ProductoDetalleScreenState extends State<ProductoDetalleScreen> {
     }
   }
 
-  Future<void> _lanzarMotor3DDirecto({
-    required String targetUrl,
-    required int productoId,
-    int? varianteId,
-  }) async {
-    final auth = Provider.of<AuthProvider>(context, listen: false);
 
-    // Registrar telemetría de la sesión (CU24) en PostgreSQL
-    VestidorApiService.registrarSesion(
-      clienteId: auth.usuario?.id,
-      productoId: productoId,
-      varianteId: varianteId,
-      origen: 'CATALOGO_3D_DIRECTO',
-    );
-
-    // Modal de Calibración
-    showDialog(
-      context: context,
-      barrierDismissible: false,
-      builder: (ctx) => AlertDialog(
-        backgroundColor: const Color(0xFF0F172A),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        content: const Padding(
-          padding: EdgeInsets.symmetric(vertical: 8),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              CircularProgressIndicator(color: Color(0xFF00E5FF)),
-              SizedBox(height: 18),
-              Text(
-                'Iniciando Motor AR 3D StyleAR...',
-                style: TextStyle(
-                  color: Colors.white,
-                  fontWeight: FontWeight.bold,
-                  fontSize: 16,
-                ),
-              ),
-              SizedBox(height: 8),
-              Text(
-                'Calibrando sensor de tracking a 60 FPS\ny sincronizando telemetría con PostgreSQL (CU24)...',
-                textAlign: TextAlign.center,
-                style: TextStyle(color: Colors.white60, fontSize: 12),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-
-    await Future.delayed(const Duration(milliseconds: 1200));
-    if (mounted) Navigator.pop(context);
-
-    final cleanUrl = targetUrl.trim();
-    final uri = Uri.parse(cleanUrl);
-
-    bool launched = false;
-    // Intento 1: External application (app nativa o navegador externo)
-    try {
-      launched = await launchUrl(uri, mode: LaunchMode.externalApplication);
-    } catch (e) {
-      debugPrint('Error en LaunchMode.externalApplication: $e');
-    }
-
-    // Intento 2: Platform default si no abrió
-    if (!launched) {
-      try {
-        launched = await launchUrl(uri, mode: LaunchMode.platformDefault);
-      } catch (e) {
-        debugPrint('Error en LaunchMode.platformDefault: $e');
-      }
-    }
-
-    // Intento 3: In-app browser como fallback
-    if (!launched) {
-      try {
-        launched = await launchUrl(uri, mode: LaunchMode.inAppBrowserView);
-      } catch (e) {
-        debugPrint('Error en LaunchMode.inAppBrowserView: $e');
-      }
-    }
-
-    if (!launched && mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('No se pudo abrir el motor AR 3D. Verifica el navegador de tu dispositivo.'),
-          backgroundColor: Colors.redAccent,
-        ),
-      );
-    }
-  }
 
   void _abrirModalOpcionesVestidor(CatalogoPrendaDetalle detalle, CatalogoVariante? varianteActual) {
-    final bool tiene3D = detalle.modelo3dUrl != null && detalle.modelo3dUrl!.trim().isNotEmpty;
-
     showModalBottomSheet(
       context: context,
       backgroundColor: const Color(0xFF0F172A),
@@ -318,40 +226,39 @@ class _ProductoDetalleScreenState extends State<ProductoDetalleScreen> {
 
                 const SizedBox(height: 14),
 
-                // OPCIÓN 2: Vestidor 3D en Vivo (EN GRIS SOLO SI NO TIENE MODELO 3D)
+                // OPCIÓN 2: Vestidor en Vivo con IA (Cámara en Tiempo Real - Decart Lucy 3.5)
                 GestureDetector(
-                  onTap: tiene3D
-                      ? () {
-                          Navigator.pop(ctx);
-                          _lanzarMotor3DDirecto(
-                            targetUrl: detalle.modelo3dUrl!,
-                            productoId: detalle.productoId,
-                            varianteId: varianteActual?.id,
-                          );
-                        }
-                      : () {
-                          Navigator.pop(ctx);
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(
-                              content: Text(
-                                'Esta prenda aún no cuenta con modelo 3D en vivo. Utiliza la opción "Simulador con IA" para probártela.',
-                              ),
-                              backgroundColor: Color(0xFF334155),
-                              duration: Duration(seconds: 3),
-                            ),
-                          );
-                        },
+                  onTap: () {
+                    Navigator.pop(ctx);
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => VestidorEnVivoScreen(
+                          productoInicialId: detalle.productoId,
+                        ),
+                      ),
+                    );
+                  },
                   child: Container(
                     padding: const EdgeInsets.all(16),
                     decoration: BoxDecoration(
-                      color: tiene3D
-                          ? const Color(0xFF1E293B).withValues(alpha: 0.6)
-                          : const Color(0xFF1E293B).withValues(alpha: 0.25),
+                      gradient: const LinearGradient(
+                        colors: [Color(0xFF1E293B), Color(0xFF0F172A)],
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                      ),
                       borderRadius: BorderRadius.circular(18),
                       border: Border.all(
-                        color: tiene3D ? const Color(0xFF60A5FA).withValues(alpha: 0.5) : Colors.white10,
-                        width: tiene3D ? 1.2 : 1,
+                        color: const Color(0xFF10B981).withValues(alpha: 0.6),
+                        width: 1.5,
                       ),
+                      boxShadow: [
+                        BoxShadow(
+                          color: const Color(0xFF10B981).withValues(alpha: 0.12),
+                          blurRadius: 10,
+                          offset: const Offset(0, 4),
+                        ),
+                      ],
                     ),
                     child: Row(
                       children: [
@@ -359,14 +266,12 @@ class _ProductoDetalleScreenState extends State<ProductoDetalleScreen> {
                           width: 48,
                           height: 48,
                           decoration: BoxDecoration(
-                            color: tiene3D
-                                ? const Color(0xFF3B82F6).withValues(alpha: 0.2)
-                                : Colors.white.withValues(alpha: 0.04),
+                            color: const Color(0xFF10B981).withValues(alpha: 0.2),
                             borderRadius: BorderRadius.circular(14),
                           ),
-                          child: Icon(
-                            Icons.view_in_ar_rounded,
-                            color: tiene3D ? const Color(0xFF60A5FA) : Colors.white24,
+                          child: const Icon(
+                            Icons.videocam_rounded,
+                            color: Color(0xFF10B981),
                             size: 26,
                           ),
                         ),
@@ -377,10 +282,10 @@ class _ProductoDetalleScreenState extends State<ProductoDetalleScreen> {
                             children: [
                               Row(
                                 children: [
-                                  Text(
-                                    'Vestidor 3D en Vivo',
+                                  const Text(
+                                    'Vestidor en Vivo con IA',
                                     style: TextStyle(
-                                      color: tiene3D ? Colors.white : Colors.white38,
+                                      color: Colors.white,
                                       fontWeight: FontWeight.bold,
                                       fontSize: 15,
                                     ),
@@ -389,15 +294,13 @@ class _ProductoDetalleScreenState extends State<ProductoDetalleScreen> {
                                   Container(
                                     padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                                     decoration: BoxDecoration(
-                                      color: tiene3D
-                                          ? Colors.blueAccent.withValues(alpha: 0.2)
-                                          : Colors.white.withValues(alpha: 0.05),
+                                      color: const Color(0xFF10B981).withValues(alpha: 0.2),
                                       borderRadius: BorderRadius.circular(8),
                                     ),
-                                    child: Text(
-                                      tiene3D ? 'Tracking 60 FPS' : 'No disponible en 3D',
+                                    child: const Text(
+                                      '🔴 Streaming WebRTC',
                                       style: TextStyle(
-                                        color: tiene3D ? const Color(0xFF60A5FA) : Colors.white38,
+                                        color: Color(0xFF10B981),
                                         fontSize: 10,
                                         fontWeight: FontWeight.bold,
                                       ),
@@ -406,12 +309,10 @@ class _ProductoDetalleScreenState extends State<ProductoDetalleScreen> {
                                 ],
                               ),
                               const SizedBox(height: 5),
-                              Text(
-                                tiene3D
-                                    ? 'Tracking corporal completo a 60 FPS con física de tela volumétrica en tiempo real.'
-                                    : 'Esta prenda aún no cuenta con modelo volumétrico 3D. Elige "Simulador con IA" para probártela.',
+                              const Text(
+                                'Prueba esta prenda en movimiento frente a la cámara en tiempo real usando Decart Lucy VTON 3.5.',
                                 style: TextStyle(
-                                  color: tiene3D ? Colors.white70 : Colors.white30,
+                                  color: Colors.white70,
                                   fontSize: 11,
                                   height: 1.3,
                                 ),

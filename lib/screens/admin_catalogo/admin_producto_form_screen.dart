@@ -18,7 +18,6 @@ class _AdminProductoFormScreenState extends State<AdminProductoFormScreen> {
   late TextEditingController _nombreCtrl;
   late TextEditingController _descCtrl;
   late TextEditingController _materialCtrl;
-  late TextEditingController _modelo3dUrlCtrl;
   late TextEditingController _anchoBaseCtrl;
   late TextEditingController _largoBaseCtrl;
   final TextEditingController _imagenUrlCtrl = TextEditingController();
@@ -46,7 +45,6 @@ class _AdminProductoFormScreenState extends State<AdminProductoFormScreen> {
     _nombreCtrl = TextEditingController(text: p?.nombre ?? '');
     _descCtrl = TextEditingController(text: p?.descripcion ?? '');
     _materialCtrl = TextEditingController(text: p?.material ?? '');
-    _modelo3dUrlCtrl = TextEditingController(text: p?.modelo3dUrl ?? '');
     _anchoBaseCtrl = TextEditingController(text: (p?.anchoBaseCm ?? 53.0).toString());
     _largoBaseCtrl = TextEditingController(text: (p?.largoBaseCm ?? 72.0).toString());
 
@@ -65,7 +63,6 @@ class _AdminProductoFormScreenState extends State<AdminProductoFormScreen> {
     _nombreCtrl.dispose();
     _descCtrl.dispose();
     _materialCtrl.dispose();
-    _modelo3dUrlCtrl.dispose();
     _anchoBaseCtrl.dispose();
     _largoBaseCtrl.dispose();
     _imagenUrlCtrl.dispose();
@@ -167,7 +164,6 @@ class _AdminProductoFormScreenState extends State<AdminProductoFormScreen> {
     try {
       final ancho = double.tryParse(_anchoBaseCtrl.text.trim()) ?? 53.0;
       final largo = double.tryParse(_largoBaseCtrl.text.trim()) ?? 72.0;
-      final modelo3d = _modelo3dUrlCtrl.text.trim().isNotEmpty ? _modelo3dUrlCtrl.text.trim() : null;
 
       if (_esEdicion) {
         await AdminCatalogoService.actualizarProducto(
@@ -182,7 +178,6 @@ class _AdminProductoFormScreenState extends State<AdminProductoFormScreen> {
           tipoCorte: _tipoCorte,
           anchoBaseCm: ancho,
           largoBaseCm: largo,
-          modelo3dUrl: modelo3d,
           coleccionesIds: widget.producto?.coleccionesIds ?? const [],
           proveedoresIds: widget.producto?.proveedoresIds ?? const [],
           imagenes: _imagenes,
@@ -199,7 +194,6 @@ class _AdminProductoFormScreenState extends State<AdminProductoFormScreen> {
           tipoCorte: _tipoCorte,
           anchoBaseCm: ancho,
           largoBaseCm: largo,
-          modelo3dUrl: modelo3d,
           coleccionesIds: const [],
           proveedoresIds: const [],
           imagenes: _imagenes,
@@ -447,18 +441,6 @@ class _AdminProductoFormScreenState extends State<AdminProductoFormScreen> {
                         }),
                         const SizedBox(height: 10),
 
-                        const SizedBox(height: 14),
-
-                        TextFormField(
-                          controller: _modelo3dUrlCtrl,
-                          decoration: const InputDecoration(
-                            labelText: 'URL Modelo 3D (.glb)',
-                            hintText: 'https://.../modelo.glb o ruta estática',
-                            border: OutlineInputBorder(),
-                            prefixIcon: Icon(Icons.view_in_ar),
-                            isDense: true,
-                          ),
-                        ),
                         const SizedBox(height: 14),
 
                         Row(

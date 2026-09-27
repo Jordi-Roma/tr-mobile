@@ -1,17 +1,15 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
-import 'package:url_launcher/url_launcher.dart';
 
 import '../../core/constants/app_colors.dart';
-import '../../providers/auth_provider.dart';
 import '../../providers/carrito_provider.dart';
 import 'models/perfil_medidas.dart';
 import 'models/prenda_ar.dart';
 import 'services/vestidor_api_service.dart';
 import 'widgets/medidas_bottom_sheet.dart';
-import 'espejo_virtual_in_app_screen.dart';
 import 'probador_ia_screen.dart';
+import 'vestidor_en_vivo_screen.dart';
 
 class VestidorScreen extends StatefulWidget {
   final int productoId;
@@ -120,14 +118,6 @@ class _VestidorScreenState extends State<VestidorScreen> {
         _isLoading = false;
       });
     }
-  }
-
-  String? get _urlLenteActivo {
-    final sup = _superiorSeleccionada?.modelo3dUrl?.trim();
-    if (sup != null && sup.isNotEmpty) return sup;
-    final inf = _inferiorSeleccionada?.modelo3dUrl?.trim();
-    if (inf != null && inf.isNotEmpty) return inf;
-    return null;
   }
 
   void _abrirEspejoVirtualAR() {
@@ -263,123 +253,21 @@ class _VestidorScreenState extends State<VestidorScreen> {
             ),
           ),
           const SizedBox(height: 12),
-          // Opción 2: Motor AR 3D Avanzado (Tracking 60 FPS)
-          Builder(
-            builder: (context) {
-              final String? urlMotor = _urlLenteActivo;
-              final bool tieneMotor = urlMotor != null && urlMotor.isNotEmpty;
-
-              return GestureDetector(
-                onTap: tieneMotor
-                    ? () {
-                        Navigator.pop(modalContext);
-                        _lanzarMotorARNeuronal(urlMotor);
-                      }
-                    : () {
-                        Navigator.pop(modalContext);
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(
-                            content: Text(
-                              'Esta prenda no cuenta con calibración de sensor 3D.',
-                            ),
-                            backgroundColor: Color(0xFF334155),
-                          ),
-                        );
-                      },
-                child: Container(
-                  padding: const EdgeInsets.all(16),
-                  decoration: BoxDecoration(
-                    color: tieneMotor
-                        ? const Color(0xFF1E293B).withValues(alpha: 0.6)
-                        : const Color(0xFF1E293B).withValues(alpha: 0.25),
-                    borderRadius: BorderRadius.circular(18),
-                    border: Border.all(
-                      color: tieneMotor ? Colors.white12 : Colors.white10,
-                      width: 1,
-                    ),
-                  ),
-                  child: Row(
-                    children: [
-                      Container(
-                        width: 46,
-                        height: 46,
-                        decoration: BoxDecoration(
-                          color: tieneMotor ? Colors.white10 : Colors.white.withValues(alpha: 0.04),
-                          borderRadius: BorderRadius.circular(14),
-                        ),
-                        child: Icon(
-                          Icons.view_in_ar_rounded,
-                          color: tieneMotor ? const Color(0xFF00E5FF) : Colors.white24,
-                          size: 24,
-                        ),
-                      ),
-                      const SizedBox(width: 14),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Row(
-                              children: [
-                                Text(
-                                  'Vestidor 3D en Vivo',
-                                  style: TextStyle(
-                                    color: tieneMotor ? Colors.white : Colors.white38,
-                                    fontWeight: FontWeight.bold,
-                                    fontSize: 14,
-                                  ),
-                                ),
-                                const Spacer(),
-                                Container(
-                                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                                  decoration: BoxDecoration(
-                                    color: tieneMotor
-                                        ? Colors.blueAccent.withValues(alpha: 0.2)
-                                        : Colors.white.withValues(alpha: 0.05),
-                                    borderRadius: BorderRadius.circular(8),
-                                  ),
-                                  child: Text(
-                                    tieneMotor ? 'Tracking 60 FPS' : 'No disponible en 3D',
-                                    style: TextStyle(
-                                      color: tieneMotor ? const Color(0xFF60A5FA) : Colors.white38,
-                                      fontSize: 10,
-                                      fontWeight: FontWeight.bold,
-                                    ),
-                                  ),
-                                ),
-                              ],
-                            ),
-                            const SizedBox(height: 4),
-                            Text(
-                              tieneMotor
-                                  ? 'Tracking corporal completo y física de tela en tiempo real con modelo calibrado.'
-                                  : 'Esta prenda aún no cuenta con modelo volumétrico 3D calibrado.',
-                              style: TextStyle(
-                                color: tieneMotor ? Colors.white70 : Colors.white30,
-                                fontSize: 11,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              );
-            },
-          ),
-          const SizedBox(height: 12),
-          // Opción 3: Espejo en Vivo (Cámara Interna)
+          // Opción 2: Vestidor en Vivo con IA (Cámara en Tiempo Real - Decart Lucy 3.5)
           GestureDetector(
             onTap: () {
               Navigator.pop(modalContext);
-              _abrirProbadorInApp();
+              _abrirVestidorEnVivo();
             },
             child: Container(
               padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
-                color: const Color(0xFF1E293B).withValues(alpha: 0.4),
+                color: const Color(0xFF1E293B).withValues(alpha: 0.6),
                 borderRadius: BorderRadius.circular(18),
-                border: Border.all(color: Colors.white10, width: 1),
+                border: Border.all(
+                  color: const Color(0xFF10B981).withValues(alpha: 0.5),
+                  width: 1.2,
+                ),
               ),
               child: Row(
                 children: [
@@ -387,28 +275,48 @@ class _VestidorScreenState extends State<VestidorScreen> {
                     width: 46,
                     height: 46,
                     decoration: BoxDecoration(
-                      color: Colors.white10,
+                      color: const Color(0xFF10B981).withValues(alpha: 0.18),
                       borderRadius: BorderRadius.circular(14),
                     ),
-                    child: const Icon(Icons.camera_alt_outlined, color: Colors.white60, size: 24),
+                    child: const Icon(
+                      Icons.videocam_rounded,
+                      color: Color(0xFF10B981),
+                      size: 24,
+                    ),
                   ),
                   const SizedBox(width: 14),
                   const Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text(
-                          'Espejo Virtual en Vivo',
-                          style: TextStyle(
-                            color: Colors.white,
-                            fontWeight: FontWeight.bold,
-                            fontSize: 14,
-                          ),
+                        Row(
+                          children: [
+                            Text(
+                              'Vestidor en Vivo con IA',
+                              style: TextStyle(
+                                color: Colors.white,
+                                fontWeight: FontWeight.bold,
+                                fontSize: 14,
+                              ),
+                            ),
+                            Spacer(),
+                            Text(
+                              '🔴 Realtime',
+                              style: TextStyle(
+                                color: Color(0xFF10B981),
+                                fontSize: 10,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ],
                         ),
                         SizedBox(height: 4),
                         Text(
-                          'Cámara selfie continua con superposición rápida de prendas.',
-                          style: TextStyle(color: Colors.white60, fontSize: 11),
+                          'Cámara frontal en vivo con Decart Lucy VTON 3.5 amoldando la ropa en movimiento.',
+                          style: TextStyle(
+                            color: Colors.white70,
+                            fontSize: 11,
+                          ),
                         ),
                       ],
                     ),
@@ -420,110 +328,6 @@ class _VestidorScreenState extends State<VestidorScreen> {
         ],
       ),
     );
-  }
-
-  Future<void> _lanzarMotorARNeuronal([String? customUrl]) async {
-    final auth = Provider.of<AuthProvider>(context, listen: false);
-    final targetUrl = customUrl ?? _urlLenteActivo;
-
-    if (targetUrl == null || targetUrl.isEmpty) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('La prenda seleccionada no cuenta con calibración de motor 3D.'),
-            backgroundColor: Color(0xFF334155),
-          ),
-        );
-      }
-      return;
-    }
-
-    // Registrar telemetría de la sesión (CU24) en PostgreSQL
-    if (_superiorSeleccionada != null) {
-      VestidorApiService.registrarSesion(
-        clienteId: auth.usuario?.id,
-        productoId: _superiorSeleccionada!.productoId,
-        origen: 'MOTOR_AR_NEURAL_60FPS',
-      );
-    }
-    if (_inferiorSeleccionada != null) {
-      VestidorApiService.registrarSesion(
-        clienteId: auth.usuario?.id,
-        productoId: _inferiorSeleccionada!.productoId,
-        origen: 'MOTOR_AR_NEURAL_60FPS',
-      );
-    }
-
-    // Modal de Calibración de Alta Tecnología
-    showDialog(
-      context: context,
-      barrierDismissible: false,
-      builder: (ctx) => AlertDialog(
-        backgroundColor: const Color(0xFF0F172A),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        content: const Padding(
-          padding: EdgeInsets.symmetric(vertical: 8),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              CircularProgressIndicator(color: Color(0xFF00E5FF)),
-              SizedBox(height: 18),
-              Text(
-                'Iniciando Motor AR Neural StyleAR...',
-                style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16),
-              ),
-              SizedBox(height: 8),
-              Text(
-                'Calibrando sensor de tracking a 60 FPS\ny sincronizando telemetría con PostgreSQL (CU24)...',
-                textAlign: TextAlign.center,
-                style: TextStyle(color: Colors.white60, fontSize: 12),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-
-    await Future.delayed(const Duration(milliseconds: 1200));
-    if (mounted) Navigator.pop(context);
-
-    final cleanUrl = targetUrl.trim();
-    final uri = Uri.parse(cleanUrl);
-
-    bool launched = false;
-    // Intento 1: External application (app nativa o navegador externo)
-    try {
-      launched = await launchUrl(uri, mode: LaunchMode.externalApplication);
-    } catch (e) {
-      debugPrint('Error en LaunchMode.externalApplication: $e');
-    }
-
-    // Intento 2: Platform default
-    if (!launched) {
-      try {
-        launched = await launchUrl(uri, mode: LaunchMode.platformDefault);
-      } catch (e) {
-        debugPrint('Error en LaunchMode.platformDefault: $e');
-      }
-    }
-
-    // Intento 3: In-app browser
-    if (!launched) {
-      try {
-        launched = await launchUrl(uri, mode: LaunchMode.inAppBrowserView);
-      } catch (e) {
-        debugPrint('Error en LaunchMode.inAppBrowserView: $e');
-      }
-    }
-
-    if (!launched && mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('No se pudo abrir el motor AR 3D. Verifica el navegador de tu dispositivo.'),
-          backgroundColor: Colors.redAccent,
-        ),
-      );
-    }
   }
 
   void _abrirProbadorIA() {
@@ -551,31 +355,26 @@ class _VestidorScreenState extends State<VestidorScreen> {
     );
   }
 
-  void _abrirProbadorInApp() {
-    final auth = Provider.of<AuthProvider>(context, listen: false);
+  void _abrirVestidorEnVivo() {
+    final targetId = (_superiorSeleccionada == null && _inferiorSeleccionada != null)
+        ? _inferiorSeleccionada!.productoId
+        : (_superiorSeleccionada?.productoId ?? _inferiorSeleccionada?.productoId);
 
-    if (_superiorSeleccionada != null) {
-      VestidorApiService.registrarSesion(
-        clienteId: auth.usuario?.id,
-        productoId: _superiorSeleccionada!.productoId,
-        origen: 'MOVIL_ESPEJO_INAPP',
+    if (targetId == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Por favor, selecciona al menos una prenda para abrir el vestidor en vivo.'),
+          backgroundColor: Colors.amber,
+        ),
       );
-    }
-    if (_inferiorSeleccionada != null) {
-      VestidorApiService.registrarSesion(
-        clienteId: auth.usuario?.id,
-        productoId: _inferiorSeleccionada!.productoId,
-        origen: 'MOVIL_ESPEJO_INAPP',
-      );
+      return;
     }
 
     Navigator.push(
       context,
       MaterialPageRoute(
-        builder: (_) => EspejoVirtualInAppScreen(
-          top: _superiorSeleccionada,
-          bottom: _inferiorSeleccionada,
-          perfilMedidas: _perfilMedidas,
+        builder: (_) => VestidorEnVivoScreen(
+          productoInicialId: targetId,
         ),
       ),
     );
