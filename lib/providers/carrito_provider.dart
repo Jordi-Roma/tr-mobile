@@ -1,11 +1,13 @@
-import 'package:flutter/material.dart';
+import '../core/session/contexto_sesion.dart';
+
+
 import '../core/constants/api_constants.dart';
 import '../core/network/api_client.dart';
 import '../core/network/api_exceptions.dart';
 import '../models/carrito_models.dart';
 import '../models/catalogo_models.dart';
 
-class CarritoProvider extends ChangeNotifier {
+class CarritoProvider extends SessionBoundNotifier {
   CarritoResponse? _carrito;
   bool _cargando = false;
   String? _error;
@@ -17,7 +19,8 @@ class CarritoProvider extends ChangeNotifier {
   int get cantidadTotal => _carrito?.totalItems ?? 0;
   double get totalMonto => _carrito?.total ?? 0.0;
   List<CarritoItemResponse> get items => _carrito?.items ?? [];
-  List<CatalogoSucursal> get sucursalesDisponibles => _carrito?.sucursalesDisponibles ?? [];
+  List<CatalogoSucursal> get sucursalesDisponibles =>
+      _carrito?.sucursalesDisponibles ?? [];
 
   void limpiarError() {
     _error = null;

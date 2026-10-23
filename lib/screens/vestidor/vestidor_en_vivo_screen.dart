@@ -9,6 +9,7 @@ import 'package:webview_flutter/webview_flutter.dart';
 import 'package:webview_flutter_android/webview_flutter_android.dart';
 
 import '../../core/constants/api_constants.dart';
+import '../../core/network/api_client.dart';
 import '../../providers/auth_provider.dart';
 import '../catalogo/producto_detalle_screen.dart';
 import 'services/vestidor_api_service.dart';
@@ -75,7 +76,17 @@ class _VestidorEnVivoScreenState extends State<VestidorEnVivoScreen> {
     await _cargarCatalogo();
 
     // 3. Iniciar WebView con WebRTC
-    _iniciarWebView();
+    if (!mounted) return;
+    try {
+      await _iniciarWebView();
+    } catch (_) {
+      if (mounted) {
+        setState(() {
+          _errorMensaje = 'No se pudo abrir el probador. Revisa tu sesión e inténtalo nuevamente.';
+          _cargandoStream = false;
+        });
+      }
+    }
   }
 
   Future<void> _cargarCatalogo() async {
@@ -102,7 +113,7 @@ class _VestidorEnVivoScreenState extends State<VestidorEnVivoScreen> {
     }
   }
 
-  void _iniciarWebView() {
+  Future<void> _iniciarWebView() async {
     final productoId = _prendaSeleccionada?['producto_id'] ?? widget.productoInicialId ?? 1;
 
     // Registrar telemetría
@@ -168,10 +179,10 @@ class _VestidorEnVivoScreenState extends State<VestidorEnVivoScreen> {
       android.setMediaPlaybackRequiresUserGesture(false);
     }
 
-    controller.loadRequest(
-      targetUrl,
-      headers: const {'ngrok-skip-browser-warning': 'true'},
-    );
+    final headers = await ApiClient.headersPara(targetUrl.toString());
+    if (!mounted) return;
+    await controller.loadRequest(targetUrl, headers: headers);
+    if (!mounted) return;
 
     setState(() {
       _webViewController = controller;

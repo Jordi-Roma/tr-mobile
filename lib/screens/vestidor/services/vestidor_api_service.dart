@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'dart:io';
 import 'package:http/http.dart' as http;
 import '../../../core/constants/api_constants.dart';
+import '../../../core/session/contexto_sesion.dart';
 import '../../../core/network/api_client.dart';
 import '../models/prenda_ar.dart';
 
@@ -61,6 +62,8 @@ class VestidorApiService {
   }) async {
     final uri = Uri.parse(ApiConstants.vestidorProbarIa);
     final request = http.MultipartRequest('POST', uri);
+    final generacion = ContextoSesion.instance.generacion;
+    request.headers.addAll(await ApiClient.headersPara(uri.toString(), withAuth: false));
 
     request.headers['Accept'] = 'application/json';
     request.fields['producto_id'] = productoId.toString();
@@ -70,11 +73,13 @@ class VestidorApiService {
 
     request.files.add(await http.MultipartFile.fromPath('imagen', imagen.path));
 
+    ApiClient.validarGeneracion(generacion);
     final streamedResponse = await request.send().timeout(
       const Duration(seconds: 90),
       onTimeout: () => throw Exception('El servidor de IA demoró más de lo esperado. Intenta nuevamente.'),
     );
     final response = await http.Response.fromStream(streamedResponse);
+    ApiClient.validarGeneracion(generacion);
 
     if (response.statusCode >= 200 && response.statusCode < 300) {
       return jsonDecode(response.body) as Map<String, dynamic>;

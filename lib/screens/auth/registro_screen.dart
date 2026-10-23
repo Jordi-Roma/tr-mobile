@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+
 import '../../core/constants/app_colors.dart';
 import '../../providers/auth_provider.dart';
 import '../../widgets/custom_button.dart';
@@ -45,15 +46,7 @@ class _RegistroScreenState extends State<RegistroScreen> {
       telefono: _telefonoCtrl.text,
     );
 
-    if (success && mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('¡Cuenta creada e inicio de sesión exitoso!'),
-          backgroundColor: AppColors.success,
-        ),
-      );
-      Navigator.of(context).pop(); // Vuelve a la pantalla principal
-    }
+    if (success) return;
   }
 
   @override
@@ -61,9 +54,7 @@ class _RegistroScreenState extends State<RegistroScreen> {
     final auth = context.watch<AuthProvider>();
 
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Crear Cuenta'),
-      ),
+      appBar: AppBar(title: const Text('Crear Cuenta')),
       body: SafeArea(
         child: SingleChildScrollView(
           padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 20),
@@ -98,16 +89,25 @@ class _RegistroScreenState extends State<RegistroScreen> {
                     decoration: BoxDecoration(
                       color: AppColors.dangerSoft,
                       borderRadius: BorderRadius.circular(10),
-                      border: Border.all(color: AppColors.danger.withValues(alpha: 0.3)),
+                      border: Border.all(
+                        color: AppColors.danger.withValues(alpha: 0.3),
+                      ),
                     ),
                     child: Row(
                       children: [
-                        const Icon(Icons.error_outline, color: AppColors.danger, size: 20),
+                        const Icon(
+                          Icons.error_outline,
+                          color: AppColors.danger,
+                          size: 20,
+                        ),
                         const SizedBox(width: 10),
                         Expanded(
                           child: Text(
                             auth.error!,
-                            style: const TextStyle(color: AppColors.danger, fontSize: 13),
+                            style: const TextStyle(
+                              color: AppColors.danger,
+                              fontSize: 13,
+                            ),
                           ),
                         ),
                       ],
@@ -124,7 +124,9 @@ class _RegistroScreenState extends State<RegistroScreen> {
                         controller: _nombreCtrl,
                         label: 'Nombre *',
                         hintText: 'Juan',
-                        validator: (v) => (v == null || v.trim().isEmpty) ? 'Requerido' : null,
+                        validator: (v) => (v == null || v.trim().isEmpty)
+                            ? 'Requerido'
+                            : null,
                       ),
                     ),
                     const SizedBox(width: 12),
@@ -133,7 +135,9 @@ class _RegistroScreenState extends State<RegistroScreen> {
                         controller: _apellidoCtrl,
                         label: 'Apellido *',
                         hintText: 'Pérez',
-                        validator: (v) => (v == null || v.trim().isEmpty) ? 'Requerido' : null,
+                        validator: (v) => (v == null || v.trim().isEmpty)
+                            ? 'Requerido'
+                            : null,
                       ),
                     ),
                   ],
@@ -147,7 +151,9 @@ class _RegistroScreenState extends State<RegistroScreen> {
                   hintText: 'ej. juanperez99',
                   prefixIcon: Icons.alternate_email,
                   validator: (v) {
-                    if (v == null || v.trim().isEmpty) return 'El username es obligatorio';
+                    if (v == null || v.trim().isEmpty) {
+                      return 'El username es obligatorio';
+                    }
                     if (v.trim().length < 4) return 'Mínimo 4 caracteres';
                     return null;
                   },
@@ -162,8 +168,12 @@ class _RegistroScreenState extends State<RegistroScreen> {
                   prefixIcon: Icons.email_outlined,
                   keyboardType: TextInputType.emailAddress,
                   validator: (v) {
-                    if (v == null || v.trim().isEmpty) return 'El correo es obligatorio';
-                    if (!v.contains('@') || !v.contains('.')) return 'Correo inválido';
+                    if (v == null || v.trim().isEmpty) {
+                      return 'El correo es obligatorio';
+                    }
+                    if (!v.contains('@') || !v.contains('.')) {
+                      return 'Correo inválido';
+                    }
                     return null;
                   },
                 ),
@@ -183,15 +193,24 @@ class _RegistroScreenState extends State<RegistroScreen> {
                 CustomTextField(
                   controller: _passwordCtrl,
                   label: 'Contraseña *',
-                  hintText: 'Mínimo 8 caracteres con letras, números y símbolos',
+                  hintText:
+                      'Mínimo 8 caracteres con letras, números y símbolos',
                   prefixIcon: Icons.lock_outline,
                   isPassword: true,
                   validator: (v) {
-                    if (v == null || v.isEmpty) return 'La contraseña es obligatoria';
+                    if (v == null || v.isEmpty) {
+                      return 'La contraseña es obligatoria';
+                    }
                     if (v.length < 8) return 'Debe tener al menos 8 caracteres';
-                    if (!v.contains(RegExp(r'[A-Z]'))) return 'Debe incluir una letra mayúscula';
-                    if (!v.contains(RegExp(r'[a-z]'))) return 'Debe incluir una letra minúscula';
-                    if (!v.contains(RegExp(r'[0-9]'))) return 'Debe incluir al menos un número';
+                    if (!v.contains(RegExp(r'[A-Z]'))) {
+                      return 'Debe incluir una letra mayúscula';
+                    }
+                    if (!v.contains(RegExp(r'[a-z]'))) {
+                      return 'Debe incluir una letra minúscula';
+                    }
+                    if (!v.contains(RegExp(r'[0-9]'))) {
+                      return 'Debe incluir al menos un número';
+                    }
                     if (!v.contains(RegExp(r'[!@#$%^&*(),.?":{}|<>]'))) {
                       return 'Debe incluir un símbolo especial (ej. !?#)';
                     }

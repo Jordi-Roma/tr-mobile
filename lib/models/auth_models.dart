@@ -5,6 +5,8 @@ class UsuarioAutenticado {
   final String username;
   final String correo;
   final List<String> roles;
+  final int? empresaId;
+  final String? empresaCodigo;
 
   UsuarioAutenticado({
     required this.id,
@@ -13,6 +15,8 @@ class UsuarioAutenticado {
     required this.username,
     required this.correo,
     required this.roles,
+    required this.empresaId,
+    required this.empresaCodigo,
   });
 
   String get nombreCompleto => '$nombre $apellido'.trim();
@@ -30,7 +34,13 @@ class UsuarioAutenticado {
       apellido: json['apellido'] ?? '',
       username: json['username'] ?? '',
       correo: json['correo'] ?? '',
-      roles: (json['roles'] as List<dynamic>?)?.map((e) => e.toString()).toList() ?? [],
+      empresaId: (json['empresa_id'] as num?)?.toInt(),
+      empresaCodigo: json['empresa_codigo'] as String?,
+      roles:
+          (json['roles'] as List<dynamic>?)
+              ?.map((e) => e.toString())
+              .toList() ??
+          [],
     );
   }
 
@@ -42,6 +52,8 @@ class UsuarioAutenticado {
       'username': username,
       'correo': correo,
       'roles': roles,
+      'empresa_id': empresaId,
+      'empresa_codigo': empresaCodigo,
     };
   }
 }
@@ -55,6 +67,8 @@ class LoginResponse {
   final String username;
   final String correo;
   final List<String> roles;
+  final int? empresaId;
+  final String? empresaCodigo;
   final String mensaje;
 
   LoginResponse({
@@ -66,6 +80,8 @@ class LoginResponse {
     required this.username,
     required this.correo,
     required this.roles,
+    required this.empresaId,
+    required this.empresaCodigo,
     required this.mensaje,
   });
 
@@ -77,6 +93,8 @@ class LoginResponse {
       username: username,
       correo: correo,
       roles: roles,
+      empresaId: empresaId,
+      empresaCodigo: empresaCodigo,
     );
   }
 
@@ -84,12 +102,20 @@ class LoginResponse {
     return LoginResponse(
       accessToken: json['access_token'] ?? '',
       tokenType: json['token_type'] ?? 'bearer',
-      usuarioId: json['usuario_id'] is int ? json['usuario_id'] : int.parse(json['usuario_id'].toString()),
+      usuarioId: json['usuario_id'] is int
+          ? json['usuario_id']
+          : int.parse(json['usuario_id'].toString()),
       nombre: json['nombre'] ?? '',
       apellido: json['apellido'] ?? '',
       username: json['username'] ?? '',
       correo: json['correo'] ?? '',
-      roles: (json['roles'] as List<dynamic>?)?.map((e) => e.toString()).toList() ?? [],
+      empresaId: (json['empresa_id'] as num?)?.toInt(),
+      empresaCodigo: json['empresa_codigo'] as String?,
+      roles:
+          (json['roles'] as List<dynamic>?)
+              ?.map((e) => e.toString())
+              .toList() ??
+          [],
       mensaje: json['mensaje'] ?? '',
     );
   }

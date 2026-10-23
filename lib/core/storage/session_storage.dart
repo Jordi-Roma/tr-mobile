@@ -1,5 +1,7 @@
 import 'dart:convert';
+
 import 'package:shared_preferences/shared_preferences.dart';
+
 import '../../models/auth_models.dart';
 
 class SessionStorage {
@@ -32,6 +34,20 @@ class SessionStorage {
     } catch (_) {
       await clearSession();
       return null;
+    }
+  }
+
+  static Future<String?> getEmpresaCodigo() async =>
+      (await SharedPreferences.getInstance()).getString(
+        'stylear_empresa_codigo_v1',
+      );
+
+  static Future<void> setEmpresaCodigo(String? codigo) async {
+    final prefs = await SharedPreferences.getInstance();
+    if (codigo == null) {
+      await prefs.remove('stylear_empresa_codigo_v1');
+    } else {
+      await prefs.setString('stylear_empresa_codigo_v1', codigo);
     }
   }
 

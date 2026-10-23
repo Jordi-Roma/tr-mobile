@@ -1,8 +1,10 @@
-import 'package:flutter/material.dart';
+import '../core/session/contexto_sesion.dart';
+
+
 import '../models/catalogo_models.dart';
 import '../services/recomendacion_service.dart';
 
-class FavoritosProvider extends ChangeNotifier {
+class FavoritosProvider extends SessionBoundNotifier {
   final Set<int> _favoritosIds = {};
   List<CatalogoPrendaItem> _favoritos = [];
   bool _cargando = false;

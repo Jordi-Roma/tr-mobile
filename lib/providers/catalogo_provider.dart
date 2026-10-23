@@ -1,10 +1,12 @@
-import 'package:flutter/material.dart';
+import '../core/session/contexto_sesion.dart';
+
+
 import '../core/constants/api_constants.dart';
 import '../core/network/api_client.dart';
 import '../core/network/api_exceptions.dart';
 import '../models/catalogo_models.dart';
 
-class CatalogoProvider extends ChangeNotifier {
+class CatalogoProvider extends SessionBoundNotifier {
   List<CatalogoPrendaItem> _prendas = [];
   CatalogoPrendaDetalle? _detalleSeleccionado;
   List<CatalogoDisponibilidad> _disponibilidad = [];
@@ -45,8 +47,12 @@ class CatalogoProvider extends ChangeNotifier {
     try {
       final queryParams = <String, String>{};
       if (_filtroBusqueda.isNotEmpty) queryParams['q'] = _filtroBusqueda;
-      if (_filtroCategoriaId != null) queryParams['categoria_id'] = _filtroCategoriaId.toString();
-      if (_filtroSucursalId != null) queryParams['sucursal_id'] = _filtroSucursalId.toString();
+      if (_filtroCategoriaId != null) {
+        queryParams['categoria_id'] = _filtroCategoriaId.toString();
+      }
+      if (_filtroSucursalId != null) {
+        queryParams['sucursal_id'] = _filtroSucursalId.toString();
+      }
       if (_filtroSoloDisponibles) queryParams['solo_disponibles'] = 'true';
       queryParams['por_pagina'] = '50';
 
@@ -56,8 +62,11 @@ class CatalogoProvider extends ChangeNotifier {
         withAuth: false,
       );
 
-      final items = (res['items'] as List<dynamic>?)
-              ?.map((e) => CatalogoPrendaItem.fromJson(e as Map<String, dynamic>))
+      final items =
+          (res['items'] as List<dynamic>?)
+              ?.map(
+                (e) => CatalogoPrendaItem.fromJson(e as Map<String, dynamic>),
+              )
               .toList() ??
           [];
       _prendas = items;
@@ -77,7 +86,9 @@ class CatalogoProvider extends ChangeNotifier {
 
     try {
       final queryParams = <String, String>{};
-      if (sucursalId != null) queryParams['sucursal_id'] = sucursalId.toString();
+      if (sucursalId != null) {
+        queryParams['sucursal_id'] = sucursalId.toString();
+      }
 
       final res = await ApiClient.get(
         ApiConstants.catalogoPrendaDetalle(id),
@@ -85,7 +96,9 @@ class CatalogoProvider extends ChangeNotifier {
         withAuth: false,
       );
 
-      _detalleSeleccionado = CatalogoPrendaDetalle.fromJson(res as Map<String, dynamic>);
+      _detalleSeleccionado = CatalogoPrendaDetalle.fromJson(
+        res as Map<String, dynamic>,
+      );
       _disponibilidad = _detalleSeleccionado!.disponibilidad;
       _cargandoDetalle = false;
       notifyListeners();
@@ -102,7 +115,9 @@ class CatalogoProvider extends ChangeNotifier {
 
     try {
       final queryParams = <String, String>{};
-      if (sucursalId != null) queryParams['sucursal_id'] = sucursalId.toString();
+      if (sucursalId != null) {
+        queryParams['sucursal_id'] = sucursalId.toString();
+      }
 
       final res = await ApiClient.get(
         ApiConstants.catalogoDisponibilidad(prendaId),
@@ -110,8 +125,12 @@ class CatalogoProvider extends ChangeNotifier {
         withAuth: false,
       );
 
-      final list = (res['disponibilidad'] as List<dynamic>?)
-              ?.map((e) => CatalogoDisponibilidad.fromJson(e as Map<String, dynamic>))
+      final list =
+          (res['disponibilidad'] as List<dynamic>?)
+              ?.map(
+                (e) =>
+                    CatalogoDisponibilidad.fromJson(e as Map<String, dynamic>),
+              )
               .toList() ??
           [];
       _disponibilidad = list;
@@ -125,7 +144,10 @@ class CatalogoProvider extends ChangeNotifier {
 
   Future<void> cargarFiltros() async {
     try {
-      final res = await ApiClient.get(ApiConstants.catalogoFiltros, withAuth: false);
+      final res = await ApiClient.get(
+        ApiConstants.catalogoFiltros,
+        withAuth: false,
+      );
       if (res is Map<String, dynamic>) {
         if (res['categorias'] != null) {
           _categorias = (res['categorias'] as List<dynamic>)

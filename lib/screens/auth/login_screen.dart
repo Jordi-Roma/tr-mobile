@@ -1,12 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+
 import '../../core/constants/app_colors.dart';
 import '../../providers/auth_provider.dart';
-import '../../providers/carrito_provider.dart';
-import '../../providers/favoritos_provider.dart';
 import '../../widgets/custom_button.dart';
 import '../../widgets/custom_text_field.dart';
 import 'registro_screen.dart';
+import 'recuperar_password_screen.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -36,18 +36,7 @@ class _LoginScreenState extends State<LoginScreen> {
       _passwordCtrl.text,
     );
 
-    if (success && mounted) {
-      final nav = Navigator.of(context);
-      final carrito = context.read<CarritoProvider>();
-      final favoritos = context.read<FavoritosProvider>();
-      carrito.limpiarCarrito();
-      favoritos.limpiar();
-      await carrito.cargarCarrito();
-      await favoritos.cargarFavoritos();
-      if (mounted) {
-        nav.pop(); // Cierra login si fue abierto modalmente
-      }
-    }
+    if (success) return;
   }
 
   @override
@@ -55,9 +44,7 @@ class _LoginScreenState extends State<LoginScreen> {
     final auth = context.watch<AuthProvider>();
 
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Iniciar Sesión'),
-      ),
+      appBar: AppBar(title: const Text('Iniciar Sesión')),
       body: SafeArea(
         child: Center(
           child: SingleChildScrollView(
@@ -68,8 +55,8 @@ class _LoginScreenState extends State<LoginScreen> {
                 mainAxisAlignment: MainAxisAlignment.center,
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  const Text(
-                    'StyleAR',
+                  Text(
+                    auth.empresa?.nombre ?? 'StyleAR',
                     style: TextStyle(
                       fontFamily: 'Playfair Display',
                       fontSize: 36,
@@ -90,6 +77,26 @@ class _LoginScreenState extends State<LoginScreen> {
                   ),
                   const SizedBox(height: 32),
 
+                  if (auth.aviso != null)
+                    Padding(
+                      padding: const EdgeInsets.only(bottom: 16),
+                      child: Text(auth.aviso!),
+                    ),
+                  TextButton(
+                    onPressed: auth.cargando
+                        ? null
+                        : () => Navigator.of(context).push(
+                            MaterialPageRoute<void>(
+                              builder: (_) => const RecuperarPasswordScreen(),
+                            ),
+                          ),
+                    child: const Text('¿Olvidaste tu contraseña?'),
+                  ),
+                  if (auth.requiereLogin)
+                    TextButton(
+                      onPressed: auth.cargando ? null : auth.continuarVisitante,
+                      child: const Text('Continuar como visitante'),
+                    ),
                   // Mensaje de Error
                   if (auth.error != null) ...[
                     Container(
@@ -97,16 +104,25 @@ class _LoginScreenState extends State<LoginScreen> {
                       decoration: BoxDecoration(
                         color: AppColors.dangerSoft,
                         borderRadius: BorderRadius.circular(10),
-                        border: Border.all(color: AppColors.danger.withValues(alpha: 0.3)),
+                        border: Border.all(
+                          color: AppColors.danger.withValues(alpha: 0.3),
+                        ),
                       ),
                       child: Row(
                         children: [
-                          const Icon(Icons.error_outline, color: AppColors.danger, size: 20),
+                          const Icon(
+                            Icons.error_outline,
+                            color: AppColors.danger,
+                            size: 20,
+                          ),
                           const SizedBox(width: 10),
                           Expanded(
                             child: Text(
                               auth.error!,
-                              style: const TextStyle(color: AppColors.danger, fontSize: 13),
+                              style: const TextStyle(
+                                color: AppColors.danger,
+                                fontSize: 13,
+                              ),
                             ),
                           ),
                         ],
@@ -160,7 +176,10 @@ class _LoginScreenState extends State<LoginScreen> {
                     children: [
                       const Text(
                         '¿Aún no tienes cuenta? ',
-                        style: TextStyle(fontSize: 13, color: AppColors.textSecondary),
+                        style: TextStyle(
+                          fontSize: 13,
+                          color: AppColors.textSecondary,
+                        ),
                       ),
                       GestureDetector(
                         onTap: () {

@@ -1,10 +1,12 @@
-import 'package:flutter/material.dart';
+import '../core/session/contexto_sesion.dart';
+
+
 import '../core/constants/api_constants.dart';
 import '../core/network/api_client.dart';
 import '../core/network/api_exceptions.dart';
 import '../models/reserva_models.dart';
 
-class ReservaProvider extends ChangeNotifier {
+class ReservaProvider extends SessionBoundNotifier {
   List<ReservaResponse> _misReservas = [];
   List<ReservaResponse> _reservasAdmin = [];
   ReservaResponse? _reservaDetalle;
@@ -37,11 +39,14 @@ class ReservaProvider extends ChangeNotifier {
         body: {
           'sucursal_id': sucursalId,
           'fecha_cita': fechaCita,
-          if (observacion != null && observacion.isNotEmpty) 'observacion': observacion,
+          if (observacion != null && observacion.isNotEmpty)
+            'observacion': observacion,
         },
       );
 
-      final nuevaReserva = ReservaResponse.fromJson(res as Map<String, dynamic>);
+      final nuevaReserva = ReservaResponse.fromJson(
+        res as Map<String, dynamic>,
+      );
       _misReservas.insert(0, nuevaReserva);
       _cargando = false;
       notifyListeners();
@@ -61,7 +66,8 @@ class ReservaProvider extends ChangeNotifier {
 
     try {
       final res = await ApiClient.get(ApiConstants.misReservas);
-      _misReservas = (res as List<dynamic>?)
+      _misReservas =
+          (res as List<dynamic>?)
               ?.map((e) => ReservaResponse.fromJson(e as Map<String, dynamic>))
               .toList() ??
           [];
@@ -82,14 +88,17 @@ class ReservaProvider extends ChangeNotifier {
     try {
       final queryParams = <String, String>{};
       if (estado != null && estado.isNotEmpty) queryParams['estado'] = estado;
-      if (sucursalId != null) queryParams['sucursal_id'] = sucursalId.toString();
+      if (sucursalId != null) {
+        queryParams['sucursal_id'] = sucursalId.toString();
+      }
 
       final res = await ApiClient.get(
         ApiConstants.reservas,
         queryParams: queryParams.isNotEmpty ? queryParams : null,
       );
 
-      _reservasAdmin = (res as List<dynamic>?)
+      _reservasAdmin =
+          (res as List<dynamic>?)
               ?.map((e) => ReservaResponse.fromJson(e as Map<String, dynamic>))
               .toList() ??
           [];
@@ -125,7 +134,10 @@ class ReservaProvider extends ChangeNotifier {
     notifyListeners();
 
     try {
-      final res = await ApiClient.patch(ApiConstants.reservaCancelar(id), body: {});
+      final res = await ApiClient.patch(
+        ApiConstants.reservaCancelar(id),
+        body: {},
+      );
       final actualizada = ReservaResponse.fromJson(res as Map<String, dynamic>);
 
       // Actualizar en listas locales
@@ -191,12 +203,15 @@ class ReservaProvider extends ChangeNotifier {
         ApiConstants.reservaFinalizarVenta(id),
         body: {
           'metodo_pago': metodoPago,
-          if (observacion != null && observacion.trim().isNotEmpty) 'observacion': observacion.trim(),
+          if (observacion != null && observacion.trim().isNotEmpty)
+            'observacion': observacion.trim(),
           'items': cantidades.entries
-              .map((entry) => {
-                    'reserva_detalle_id': entry.key,
-                    'cantidad': entry.value,
-                  })
+              .map(
+                (entry) => {
+                  'reserva_detalle_id': entry.key,
+                  'cantidad': entry.value,
+                },
+              )
               .toList(),
         },
       );
@@ -204,7 +219,11 @@ class ReservaProvider extends ChangeNotifier {
 
       final adminIndex = _reservasAdmin.indexWhere((r) => r.id == id);
       if (adminIndex != -1) {
-        if (['COMPLETADA', 'CANCELADA', 'VENCIDA'].contains(actualizada.estado)) {
+        if ([
+          'COMPLETADA',
+          'CANCELADA',
+          'VENCIDA',
+        ].contains(actualizada.estado)) {
           _reservasAdmin.removeAt(adminIndex);
         } else {
           _reservasAdmin[adminIndex] = actualizada;
@@ -231,8 +250,13 @@ class ReservaProvider extends ChangeNotifier {
     notifyListeners();
 
     try {
-      final res = await ApiClient.post(ApiConstants.reservaAnticipoStripe(id), body: {});
-      final respuesta = ReservaPagoResponse.fromJson(res as Map<String, dynamic>);
+      final res = await ApiClient.post(
+        ApiConstants.reservaAnticipoStripe(id),
+        body: {},
+      );
+      final respuesta = ReservaPagoResponse.fromJson(
+        res as Map<String, dynamic>,
+      );
       _actualizarReservaLocal(respuesta.reserva);
       _cargando = false;
       notifyListeners();
@@ -260,16 +284,21 @@ class ReservaProvider extends ChangeNotifier {
         ApiConstants.reservaFinalizarCliente(id),
         body: {
           'metodo_pago': metodoPago,
-          if (observacion != null && observacion.trim().isNotEmpty) 'observacion': observacion.trim(),
+          if (observacion != null && observacion.trim().isNotEmpty)
+            'observacion': observacion.trim(),
           'items': cantidades.entries
-              .map((entry) => {
-                    'reserva_detalle_id': entry.key,
-                    'cantidad': entry.value,
-                  })
+              .map(
+                (entry) => {
+                  'reserva_detalle_id': entry.key,
+                  'cantidad': entry.value,
+                },
+              )
               .toList(),
         },
       );
-      final respuesta = ReservaPagoResponse.fromJson(res as Map<String, dynamic>);
+      final respuesta = ReservaPagoResponse.fromJson(
+        res as Map<String, dynamic>,
+      );
       _actualizarReservaLocal(respuesta.reserva);
       _cargando = false;
       notifyListeners();
