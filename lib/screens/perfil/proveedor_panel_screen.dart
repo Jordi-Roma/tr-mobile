@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import '../../core/network/api_exceptions.dart';
+import '../../core/session/contexto_sesion.dart';
 import '../../core/constants/app_colors.dart';
 import '../../models/proveedor_panel_models.dart';
 import '../../services/proveedor_panel_service.dart';
@@ -15,6 +17,7 @@ class _ProveedorPanelScreenState extends State<ProveedorPanelScreen> {
   List<ProveedorProducto> _productos = [];
   List<ProveedorStock> _stock = [];
   List<ProveedorEntrega> _entregas = [];
+  int _solicitud = 0;
   bool _cargando = true;
   String? _error;
 
@@ -25,6 +28,8 @@ class _ProveedorPanelScreenState extends State<ProveedorPanelScreen> {
   }
 
   Future<void> _cargarDatos() async {
+    final solicitud = ++_solicitud;
+    final generacion = ContextoSesion.instance.generacion;
     setState(() {
       _cargando = true;
       _error = null;
@@ -38,7 +43,7 @@ class _ProveedorPanelScreenState extends State<ProveedorPanelScreen> {
         ProveedorPanelService.listarEntregas(),
       ]);
 
-      if (!mounted) return;
+      if (!mounted || solicitud != _solicitud || generacion != ContextoSesion.instance.generacion) return;
       setState(() {
         _perfil = res[0] as ProveedorPerfil;
         _productos = res[1] as List<ProveedorProducto>;
@@ -47,9 +52,13 @@ class _ProveedorPanelScreenState extends State<ProveedorPanelScreen> {
         _cargando = false;
       });
     } catch (e) {
-      if (!mounted) return;
+      if (!mounted || solicitud != _solicitud || generacion != ContextoSesion.instance.generacion) return;
       setState(() {
-        _error = e.toString();
+        _perfil = null;
+        _productos = [];
+        _stock = [];
+        _entregas = [];
+        _error = e is ApiException ? e.message : 'No se pudo recuperar la información. Inténtalo nuevamente.';
         _cargando = false;
       });
     }
@@ -62,6 +71,7 @@ class _ProveedorPanelScreenState extends State<ProveedorPanelScreen> {
       child: Scaffold(
         appBar: AppBar(
           title: const Text('Panel proveedor'),
+          actions: [IconButton(tooltip: 'Actualizar información', onPressed: _cargando ? null : _cargarDatos, icon: const Icon(Icons.refresh))],
           bottom: const TabBar(
             isScrollable: true,
             tabs: [
@@ -115,7 +125,7 @@ class _ProveedorPanelScreenState extends State<ProveedorPanelScreen> {
     return TabBarView(
       children: [
         _PerfilTab(perfil: _perfil),
-        _ProductosTab(productos: _productos),
+        _ProductosTab(productos: _productos, stock: _stock),
         _StockTab(stock: _stock),
         _EntregasTab(entregas: _entregas),
       ],
@@ -136,6 +146,7 @@ class _PerfilTab extends StatelessWidget {
     }
 
     return ListView(
+      physics: const AlwaysScrollableScrollPhysics(),
       padding: const EdgeInsets.all(16),
       children: [
         Card(
@@ -180,7 +191,9 @@ class _PerfilTab extends StatelessWidget {
 class _ProductosTab extends StatelessWidget {
   final List<ProveedorProducto> productos;
 
-  const _ProductosTab({required this.productos});
+  final List<ProveedorStock> stock;
+
+  const _ProductosTab({required this.productos, required this.stock});
 
   @override
   Widget build(BuildContext context) {
@@ -189,24 +202,45 @@ class _ProductosTab extends StatelessWidget {
     }
 
     return ListView.separated(
+      physics: const AlwaysScrollableScrollPhysics(),
       padding: const EdgeInsets.all(16),
       itemCount: productos.length,
       separatorBuilder: (_, _) => const SizedBox(height: 10),
       itemBuilder: (context, index) {
         final p = productos[index];
         return Card(
-          child: ListTile(
+          child: ExpansionTile(
             leading: const CircleAvatar(
               backgroundColor: AppColors.accentSoft,
               child: Icon(Icons.checkroom_outlined, color: AppColors.accent),
             ),
             title: Text(p.nombre, style: const TextStyle(fontWeight: FontWeight.w700)),
             subtitle: Text('${p.categoria} · ${p.marca}\n${p.variantes} variantes'),
-            isThreeLine: true,
+
             trailing: Chip(
               label: Text(p.activo ? 'Activo' : 'Inactivo'),
               visualDensity: VisualDensity.compact,
             ),
+            children: [
+              const Padding(
+                padding: EdgeInsets.all(12),
+                child: Text('Consulta de producto y existencias autorizadas'),
+              ),
+              if (p.material != null && p.material!.isNotEmpty)
+                ListTile(title: const Text('Material'), subtitle: Text(p.material!)),
+              if (p.genero != null && p.genero!.isNotEmpty)
+                ListTile(title: const Text('Género'), subtitle: Text(p.genero!)),
+              if (!stock.any((item) => item.productoId == p.id))
+                const Padding(
+                  padding: EdgeInsets.all(12),
+                  child: Text('Este producto no tiene existencias registradas.'),
+                ),
+              for (final item in stock.where((item) => item.productoId == p.id))
+                ListTile(
+                  title: Text('${item.sku} · ${item.talla}/${item.color}'),
+                  subtitle: Text('${item.sucursal} · Disponible: ${item.stockDisponible} · Reservado: ${item.stockReservado} · Real: ${item.stockReal}'),
+                ),
+            ],
           ),
         );
       },
@@ -226,6 +260,7 @@ class _StockTab extends StatelessWidget {
     }
 
     return ListView.separated(
+      physics: const AlwaysScrollableScrollPhysics(),
       padding: const EdgeInsets.all(16),
       itemCount: stock.length,
       separatorBuilder: (_, _) => const SizedBox(height: 10),
@@ -272,6 +307,7 @@ class _EntregasTab extends StatelessWidget {
     }
 
     return ListView.separated(
+      physics: const AlwaysScrollableScrollPhysics(),
       padding: const EdgeInsets.all(16),
       itemCount: entregas.length,
       separatorBuilder: (_, _) => const SizedBox(height: 10),
@@ -383,6 +419,7 @@ class _EmptyState extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return ListView(
+      physics: const AlwaysScrollableScrollPhysics(),
       padding: const EdgeInsets.all(28),
       children: [
         const SizedBox(height: 80),

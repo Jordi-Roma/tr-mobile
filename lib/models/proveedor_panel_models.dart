@@ -34,6 +34,8 @@ class ProveedorProducto {
   final String marca;
   final bool activo;
   final int variantes;
+  final String? material;
+  final String? genero;
 
   ProveedorProducto({
     required this.id,
@@ -42,6 +44,8 @@ class ProveedorProducto {
     required this.marca,
     required this.activo,
     required this.variantes,
+    this.material,
+    this.genero,
   });
 
   factory ProveedorProducto.fromJson(Map<String, dynamic> json) {
@@ -52,6 +56,8 @@ class ProveedorProducto {
       marca: json['marca']?.toString() ?? 'Sin marca',
       activo: json['activo'] == true,
       variantes: _asInt(json['variantes']),
+      material: json['material']?.toString(),
+      genero: json['genero']?.toString(),
     );
   }
 }

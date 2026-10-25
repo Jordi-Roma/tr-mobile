@@ -8,6 +8,7 @@ import '../asistente/asistente_screen.dart';
 import '../carrito/carrito_screen.dart';
 import '../catalogo/catalogo_screen.dart';
 import '../perfil/perfil_screen.dart';
+import '../perfil/proveedor_panel_screen.dart';
 import '../reportes/reportes_admin_screen.dart';
 import '../reservas/mis_reservas_screen.dart';
 import '../reservas/reservas_admin_screen.dart';
@@ -38,6 +39,22 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
     final auth = context.watch<AuthProvider>();
     final carrito = context.watch<CarritoProvider>();
     final esAdminOEncargado = auth.esAdminOEncargado;
+
+    // El proveedor dispone de consultas comerciales, sin carrito ni gestión.
+    if (auth.esProveedor && !esAdminOEncargado) {
+      final index = _currentIndex < 2 ? _currentIndex : 0;
+      return Scaffold(
+        body: IndexedStack(index: index, children: const [ProveedorPanelScreen(), PerfilScreen()]),
+        bottomNavigationBar: NavigationBar(
+          selectedIndex: index,
+          onDestinationSelected: (i) => setState(() => _currentIndex = i),
+          destinations: const [
+            NavigationDestination(icon: Icon(Icons.inventory_2_outlined), label: 'Mi proveedor'),
+            NavigationDestination(icon: Icon(Icons.account_circle_outlined), label: 'Mi cuenta'),
+          ],
+        ),
+      );
+    }
 
     // Páginas para el modo Empleado / Administrador
     final paginasAdmin = [
