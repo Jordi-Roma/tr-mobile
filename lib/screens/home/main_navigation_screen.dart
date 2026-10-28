@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+
 import '../../core/constants/app_colors.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/carrito_provider.dart';
@@ -44,13 +45,55 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
     if (auth.esProveedor && !esAdminOEncargado) {
       final index = _currentIndex < 2 ? _currentIndex : 0;
       return Scaffold(
-        body: IndexedStack(index: index, children: const [ProveedorPanelScreen(), PerfilScreen()]),
+        body: IndexedStack(
+          index: index,
+          children: const [ProveedorPanelScreen(), PerfilScreen()],
+        ),
         bottomNavigationBar: NavigationBar(
           selectedIndex: index,
           onDestinationSelected: (i) => setState(() => _currentIndex = i),
           destinations: const [
-            NavigationDestination(icon: Icon(Icons.inventory_2_outlined), label: 'Mi proveedor'),
-            NavigationDestination(icon: Icon(Icons.account_circle_outlined), label: 'Mi cuenta'),
+            NavigationDestination(
+              icon: Icon(Icons.inventory_2_outlined),
+              label: 'Mi proveedor',
+            ),
+            NavigationDestination(
+              icon: Icon(Icons.account_circle_outlined),
+              label: 'Mi cuenta',
+            ),
+          ],
+        ),
+      );
+    }
+
+    // CU13 para caja, sin agregar inventario CU14 ni punto de venta CU15 móvil.
+    if (auth.esCajero && !esAdminOEncargado) {
+      final index = _currentIndex < 3 ? _currentIndex : 0;
+      return Scaffold(
+        body: IndexedStack(
+          index: index,
+          children: const [
+            CatalogoScreen(),
+            ReservasAdminScreen(),
+            PerfilScreen(),
+          ],
+        ),
+        bottomNavigationBar: NavigationBar(
+          selectedIndex: index,
+          onDestinationSelected: (i) => setState(() => _currentIndex = i),
+          destinations: const [
+            NavigationDestination(
+              icon: Icon(Icons.checkroom_outlined),
+              label: 'Catálogo',
+            ),
+            NavigationDestination(
+              icon: Icon(Icons.event_note_outlined),
+              label: 'Reservas',
+            ),
+            NavigationDestination(
+              icon: Icon(Icons.account_circle_outlined),
+              label: 'Mi cuenta',
+            ),
           ],
         ),
       );
@@ -72,9 +115,7 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
         onIrAlCatalogo: () => _irAIndex(0),
         onIrAMisReservas: () => _irAIndex(2),
       ),
-      MisReservasScreen(
-        onIrAlCatalogo: () => _irAIndex(0),
-      ),
+      MisReservasScreen(onIrAlCatalogo: () => _irAIndex(0)),
       const PerfilScreen(),
     ];
 
@@ -82,10 +123,7 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
     final indexSeguro = _currentIndex < paginas.length ? _currentIndex : 0;
 
     return Scaffold(
-      body: IndexedStack(
-        index: indexSeguro,
-        children: paginas,
-      ),
+      body: IndexedStack(index: indexSeguro, children: paginas),
       // FAB del asistente virtual IA — visible solo para clientes (no para admin/encargado)
       floatingActionButton: !esAdminOEncargado
           ? FloatingActionButton(
@@ -103,8 +141,9 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
                   builder: (_) => const FractionallySizedBox(
                     heightFactor: 0.92,
                     child: ClipRRect(
-                      borderRadius:
-                          BorderRadius.vertical(top: Radius.circular(20)),
+                      borderRadius: BorderRadius.vertical(
+                        top: Radius.circular(20),
+                      ),
                       child: AsistenteScreen(),
                     ),
                   ),
@@ -134,12 +173,18 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
                 ),
                 NavigationDestination(
                   icon: Icon(Icons.inventory_2_outlined),
-                  selectedIcon: Icon(Icons.inventory_2, color: AppColors.primary),
+                  selectedIcon: Icon(
+                    Icons.inventory_2,
+                    color: AppColors.primary,
+                  ),
                   label: 'Gestión',
                 ),
                 NavigationDestination(
                   icon: Icon(Icons.assignment_outlined),
-                  selectedIcon: Icon(Icons.assignment, color: AppColors.primary),
+                  selectedIcon: Icon(
+                    Icons.assignment,
+                    color: AppColors.primary,
+                  ),
                   label: 'Reservas',
                 ),
                 NavigationDestination(
@@ -149,7 +194,10 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
                 ),
                 NavigationDestination(
                   icon: Icon(Icons.account_circle_outlined),
-                  selectedIcon: Icon(Icons.account_circle, color: AppColors.primary),
+                  selectedIcon: Icon(
+                    Icons.account_circle,
+                    color: AppColors.primary,
+                  ),
                   label: 'Perfil',
                 ),
               ]
@@ -168,18 +216,27 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
                   selectedIcon: Badge(
                     isLabelVisible: carrito.cantidadTotal > 0,
                     label: Text('${carrito.cantidadTotal}'),
-                    child: const Icon(Icons.shopping_bag, color: AppColors.primary),
+                    child: const Icon(
+                      Icons.shopping_bag,
+                      color: AppColors.primary,
+                    ),
                   ),
                   label: 'Carrito',
                 ),
                 const NavigationDestination(
                   icon: Icon(Icons.calendar_today_outlined),
-                  selectedIcon: Icon(Icons.calendar_today, color: AppColors.primary),
+                  selectedIcon: Icon(
+                    Icons.calendar_today,
+                    color: AppColors.primary,
+                  ),
                   label: 'Mis Reservas',
                 ),
                 const NavigationDestination(
                   icon: Icon(Icons.account_circle_outlined),
-                  selectedIcon: Icon(Icons.account_circle, color: AppColors.primary),
+                  selectedIcon: Icon(
+                    Icons.account_circle,
+                    color: AppColors.primary,
+                  ),
                   label: 'Perfil',
                 ),
               ],

@@ -1,5 +1,5 @@
 import '../core/session/contexto_sesion.dart';
-
+import '../core/reintento_comercial.dart';
 
 import '../core/constants/api_constants.dart';
 import '../core/network/api_client.dart';
@@ -7,6 +7,7 @@ import '../core/network/api_exceptions.dart';
 import '../models/reserva_models.dart';
 
 class ReservaProvider extends SessionBoundNotifier {
+  final _reintento = ReintentoComercial();
   List<ReservaResponse> _misReservas = [];
   List<ReservaResponse> _reservasAdmin = [];
   ReservaResponse? _reservaDetalle;
@@ -29,6 +30,18 @@ class ReservaProvider extends SessionBoundNotifier {
     required String fechaCita,
     String? observacion,
   }) async {
+    if (_cargando) return null;
+    final datos = <String, dynamic>{
+      'sucursal_id': sucursalId,
+      'fecha_cita': fechaCita,
+      if (observacion != null && observacion.isNotEmpty)
+        'observacion': observacion,
+    };
+    final clave = _reintento.clavePara([
+      ContextoSesion.instance.generacion,
+      ContextoSesion.instance.usuario?.id,
+      datos,
+    ]);
     _cargando = true;
     _error = null;
     notifyListeners();
@@ -36,17 +49,14 @@ class ReservaProvider extends SessionBoundNotifier {
     try {
       final res = await ApiClient.post(
         ApiConstants.reservasDesdeCarrito,
-        body: {
-          'sucursal_id': sucursalId,
-          'fecha_cita': fechaCita,
-          if (observacion != null && observacion.isNotEmpty)
-            'observacion': observacion,
-        },
+        body: {...datos, 'clave_operacion': clave},
       );
 
       final nuevaReserva = ReservaResponse.fromJson(
         res as Map<String, dynamic>,
       );
+      _reintento.completar();
+      _misReservas.removeWhere((r) => r.id == nuevaReserva.id);
       _misReservas.insert(0, nuevaReserva);
       _cargando = false;
       notifyListeners();

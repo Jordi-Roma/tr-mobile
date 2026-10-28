@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 import 'package:qr_flutter/qr_flutter.dart';
+
 import '../../core/constants/app_colors.dart';
 import '../../models/reserva_models.dart';
 import '../../providers/auth_provider.dart';
@@ -50,14 +51,21 @@ class _ReservaDetalleScreenState extends State<ReservaDetalleScreen> {
       context: context,
       builder: (ctx) => AlertDialog(
         title: const Text('¿Cancelar Reserva?'),
-        content: const Text('¿Deseas cancelar esta reserva? El stock reservado será devuelto al inventario disponible.'),
+        content: const Text(
+          '¿Deseas cancelar esta reserva? El stock reservado será devuelto al inventario disponible.',
+        ),
         actions: [
-          TextButton(onPressed: () => Navigator.of(ctx).pop(), child: const Text('Mantener')),
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(),
+            child: const Text('Mantener'),
+          ),
           ElevatedButton(
             style: ElevatedButton.styleFrom(backgroundColor: AppColors.danger),
             onPressed: () async {
               Navigator.of(ctx).pop();
-              final ok = await context.read<ReservaProvider>().cancelarReserva(reserva.id);
+              final ok = await context.read<ReservaProvider>().cancelarReserva(
+                reserva.id,
+              );
               if (ok && mounted) {
                 ScaffoldMessenger.of(context).showSnackBar(
                   const SnackBar(
@@ -93,19 +101,21 @@ class _ReservaDetalleScreenState extends State<ReservaDetalleScreen> {
   }
 
   bool _puedeFinalizar(ReservaResponse reserva) {
-    return !_requiereAnticipo(reserva)
-        && !['COMPLETADA', 'CANCELADA', 'VENCIDA'].contains(reserva.estado)
-        && _subtotalSeleccionado(reserva) > 0;
+    return !_requiereAnticipo(reserva) &&
+        !['COMPLETADA', 'CANCELADA', 'VENCIDA'].contains(reserva.estado) &&
+        _subtotalSeleccionado(reserva) > 0;
   }
 
   bool _requiereAnticipo(ReservaResponse reserva) {
-    return reserva.montoReserva > 0
-        && !reserva.anticipoPagado
-        && !['COMPLETADA', 'CANCELADA', 'VENCIDA'].contains(reserva.estado);
+    return reserva.montoReserva > 0 &&
+        !reserva.anticipoPagado &&
+        !['COMPLETADA', 'CANCELADA', 'VENCIDA'].contains(reserva.estado);
   }
 
   Future<void> _pagarAnticipo(ReservaResponse reserva) async {
-    final respuesta = await context.read<ReservaProvider>().pagarAnticipoStripe(reserva.id);
+    final respuesta = await context.read<ReservaProvider>().pagarAnticipoStripe(
+      reserva.id,
+    );
     if (!mounted) return;
     if (respuesta?.checkoutUrl != null && respuesta!.ordenId != null) {
       await Navigator.of(context).push(
@@ -123,8 +133,14 @@ class _ReservaDetalleScreenState extends State<ReservaDetalleScreen> {
     }
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        content: Text(respuesta?.mensaje ?? context.read<ReservaProvider>().error ?? 'No se pudo generar el pago del anticipo.'),
-        backgroundColor: respuesta == null ? AppColors.danger : AppColors.success,
+        content: Text(
+          respuesta?.mensaje ??
+              context.read<ReservaProvider>().error ??
+              'No se pudo generar el pago del anticipo.',
+        ),
+        backgroundColor: respuesta == null
+            ? AppColors.danger
+            : AppColors.success,
       ),
     );
   }
@@ -132,15 +148,20 @@ class _ReservaDetalleScreenState extends State<ReservaDetalleScreen> {
   Future<void> _finalizarVenta(ReservaResponse reserva) async {
     if (!_puedeFinalizar(reserva)) return;
     final ok = await context.read<ReservaProvider>().finalizarComoVenta(
-          id: reserva.id,
-          metodoPago: _metodoPago,
-          observacion: _observacionVentaCtrl.text,
-          cantidades: Map<int, int>.from(_cantidadesVenta),
-        );
+      id: reserva.id,
+      metodoPago: _metodoPago,
+      observacion: _observacionVentaCtrl.text,
+      cantidades: Map<int, int>.from(_cantidadesVenta),
+    );
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        content: Text(ok ? 'Reserva cerrada como venta presencial.' : (context.read<ReservaProvider>().error ?? 'No se pudo finalizar la venta.')),
+        content: Text(
+          ok
+              ? 'Reserva cerrada como venta presencial.'
+              : (context.read<ReservaProvider>().error ??
+                    'No se pudo finalizar la venta.'),
+        ),
         backgroundColor: ok ? AppColors.success : AppColors.danger,
       ),
     );
@@ -157,11 +178,11 @@ class _ReservaDetalleScreenState extends State<ReservaDetalleScreen> {
 
   Future<void> _confirmarFinalizarMiReserva(ReservaResponse reserva) async {
     final respuesta = await context.read<ReservaProvider>().finalizarMiReserva(
-          id: reserva.id,
-          metodoPago: _metodoPago,
-          observacion: _observacionVentaCtrl.text,
-          cantidades: Map<int, int>.from(_cantidadesVenta),
-        );
+      id: reserva.id,
+      metodoPago: _metodoPago,
+      observacion: _observacionVentaCtrl.text,
+      cantidades: Map<int, int>.from(_cantidadesVenta),
+    );
     if (!mounted) return;
     if (respuesta?.checkoutUrl != null && respuesta!.ordenId != null) {
       await Navigator.of(context).push(
@@ -179,8 +200,14 @@ class _ReservaDetalleScreenState extends State<ReservaDetalleScreen> {
     }
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        content: Text(respuesta?.mensaje ?? context.read<ReservaProvider>().error ?? 'No se pudo completar la reserva.'),
-        backgroundColor: respuesta == null ? AppColors.danger : AppColors.success,
+        content: Text(
+          respuesta?.mensaje ??
+              context.read<ReservaProvider>().error ??
+              'No se pudo completar la reserva.',
+        ),
+        backgroundColor: respuesta == null
+            ? AppColors.danger
+            : AppColors.success,
       ),
     );
   }
@@ -190,7 +217,10 @@ class _ReservaDetalleScreenState extends State<ReservaDetalleScreen> {
   }
 
   void _mostrarQrPago(ReservaResponse reserva) {
-    final currencyFormat = NumberFormat.currency(locale: 'es_BO', symbol: 'Bs. ');
+    final currencyFormat = NumberFormat.currency(
+      locale: 'es_BO',
+      symbol: 'Bs. ',
+    );
     final payload = _qrPayload(reserva, currencyFormat);
 
     showDialog(
@@ -212,7 +242,13 @@ class _ReservaDetalleScreenState extends State<ReservaDetalleScreen> {
               decoration: BoxDecoration(
                 color: Colors.white,
                 borderRadius: BorderRadius.circular(16),
-                boxShadow: const [BoxShadow(color: Color(0x22000000), blurRadius: 14, offset: Offset(0, 6))],
+                boxShadow: const [
+                  BoxShadow(
+                    color: Color(0x22000000),
+                    blurRadius: 14,
+                    offset: Offset(0, 6),
+                  ),
+                ],
               ),
               child: QrImageView(
                 data: payload,
@@ -239,7 +275,10 @@ class _ReservaDetalleScreenState extends State<ReservaDetalleScreen> {
               ),
               child: Text(
                 payload,
-                style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
+                style: const TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600,
+                ),
               ),
             ),
           ],
@@ -266,7 +305,10 @@ class _ReservaDetalleScreenState extends State<ReservaDetalleScreen> {
     final reservaProv = context.watch<ReservaProvider>();
     final auth = context.watch<AuthProvider>();
     final reserva = reservaProv.reservaDetalle;
-    final currencyFormat = NumberFormat.currency(locale: 'es_BO', symbol: 'Bs. ');
+    final currencyFormat = NumberFormat.currency(
+      locale: 'es_BO',
+      symbol: 'Bs. ',
+    );
 
     if (reservaProv.cargando || reserva == null) {
       return Scaffold(
@@ -275,13 +317,14 @@ class _ReservaDetalleScreenState extends State<ReservaDetalleScreen> {
       );
     }
     _sincronizarCantidades(reserva);
-    final puedeGestionarVenta = auth.esAdmin || auth.esEncargado || (auth.usuario?.esCajero ?? false);
-    final puedeClienteGestionar = !puedeGestionarVenta && !['COMPLETADA', 'CANCELADA', 'VENCIDA'].contains(reserva.estado);
+    final puedeGestionarVenta =
+        auth.esAdmin || auth.esEncargado || (auth.usuario?.esCajero ?? false);
+    final puedeClienteGestionar =
+        !puedeGestionarVenta &&
+        !['COMPLETADA', 'CANCELADA', 'VENCIDA'].contains(reserva.estado);
 
     return Scaffold(
-      appBar: AppBar(
-        title: Text(reserva.codigo),
-      ),
+      appBar: AppBar(title: Text(reserva.codigo)),
       body: SafeArea(
         child: SingleChildScrollView(
           padding: const EdgeInsets.all(20),
@@ -300,7 +343,11 @@ class _ReservaDetalleScreenState extends State<ReservaDetalleScreen> {
                         children: [
                           const Text(
                             'ESTADO ACTUAL',
-                            style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: AppColors.textSecondary),
+                            style: TextStyle(
+                              fontSize: 11,
+                              fontWeight: FontWeight.w700,
+                              color: AppColors.textSecondary,
+                            ),
                           ),
                           StockBadge.fromEstado(reserva.estado),
                         ],
@@ -308,32 +355,65 @@ class _ReservaDetalleScreenState extends State<ReservaDetalleScreen> {
                       const SizedBox(height: 14),
                       const Divider(),
                       const SizedBox(height: 14),
-                      _buildRow(Icons.confirmation_number_outlined, 'Código', reserva.codigo),
+                      _buildRow(
+                        Icons.confirmation_number_outlined,
+                        'Código',
+                        reserva.codigo,
+                      ),
                       const SizedBox(height: 10),
-                      _buildRow(Icons.storefront_outlined, 'Sucursal', '${reserva.sucursal} (${reserva.ciudad})'),
+                      _buildRow(
+                        Icons.storefront_outlined,
+                        'Sucursal',
+                        '${reserva.sucursal} (${reserva.ciudad})',
+                      ),
                       const SizedBox(height: 10),
-                      _buildRow(Icons.calendar_today_outlined, 'Fecha', reserva.fechaReserva.substring(0, 10)),
-                      if (reserva.fechaCita != null && reserva.fechaCita!.isNotEmpty) ...[
+                      _buildRow(
+                        Icons.calendar_today_outlined,
+                        'Fecha',
+                        reserva.fechaReserva.substring(0, 10),
+                      ),
+                      if (reserva.fechaCita != null &&
+                          reserva.fechaCita!.isNotEmpty) ...[
                         const SizedBox(height: 10),
-                        _buildRow(Icons.event_available_outlined, 'Cita', reserva.fechaCita!),
+                        _buildRow(
+                          Icons.event_available_outlined,
+                          'Cita',
+                          reserva.fechaCita!,
+                        ),
                       ],
                       const SizedBox(height: 10),
                       _buildRow(
                         Icons.payments_outlined,
                         'Anticipo',
-                        '${currencyFormat.format(reserva.montoReserva)} · ${reserva.anticipoPagado ? 'Pagado' : 'Pendiente'}',
+                        reserva.esGratuita
+                            ? 'Gratuita · sin anticipo'
+                            : '${currencyFormat.format(reserva.montoReserva)} · ${reserva.anticipoPagado ? 'Pagado' : 'Pendiente'}',
                       ),
                       if (reserva.ventaId != null) ...[
                         const SizedBox(height: 10),
-                        _buildRow(Icons.receipt_long_outlined, 'Venta generada', '#${reserva.ventaId}'),
+                        _buildRow(
+                          Icons.receipt_long_outlined,
+                          'Venta generada',
+                          '#${reserva.ventaId}',
+                        ),
                       ],
-                      if (reserva.cliente != null && reserva.cliente!.isNotEmpty) ...[
+                      if (reserva.cliente != null &&
+                          reserva.cliente!.isNotEmpty) ...[
                         const SizedBox(height: 10),
-                        _buildRow(Icons.person_outline, 'Cliente', reserva.cliente!),
+                        _buildRow(
+                          Icons.person_outline,
+                          'Cliente',
+                          reserva.cliente!,
+                        ),
                       ],
-                      if (reserva.observacion != null && reserva.observacion!.isNotEmpty) ...[
+                      if (reserva.observacion != null &&
+                          reserva.observacion!.isNotEmpty) ...[
                         const SizedBox(height: 10),
-                        _buildRow(Icons.notes_outlined, 'Nota', reserva.observacion!),
+                        _buildRow(
+                          Icons.notes_outlined,
+                          'Nota',
+                          reserva.observacion!,
+                        ),
                       ],
                     ],
                   ),
@@ -344,7 +424,12 @@ class _ReservaDetalleScreenState extends State<ReservaDetalleScreen> {
               // Prendas Reservadas
               const Text(
                 'PRENDAS EN LA RESERVA',
-                style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, letterSpacing: 0.8, color: AppColors.textSecondary),
+                style: TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w700,
+                  letterSpacing: 0.8,
+                  color: AppColors.textSecondary,
+                ),
               ),
               const SizedBox(height: 10),
 
@@ -367,7 +452,11 @@ class _ReservaDetalleScreenState extends State<ReservaDetalleScreen> {
                               color: AppColors.background,
                               borderRadius: BorderRadius.circular(8),
                             ),
-                            child: const Icon(Icons.checkroom, color: AppColors.primary, size: 24),
+                            child: const Icon(
+                              Icons.checkroom,
+                              color: AppColors.primary,
+                              size: 24,
+                            ),
                           ),
                           const SizedBox(width: 14),
                           Expanded(
@@ -376,29 +465,47 @@ class _ReservaDetalleScreenState extends State<ReservaDetalleScreen> {
                               children: [
                                 Text(
                                   item.producto,
-                                  style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14),
+                                  style: const TextStyle(
+                                    fontWeight: FontWeight.w700,
+                                    fontSize: 14,
+                                  ),
                                 ),
                                 const SizedBox(height: 2),
                                 Text(
                                   'Talla: ${item.talla} • Color: ${item.color}',
-                                  style: const TextStyle(fontSize: 12, color: AppColors.textSecondary),
+                                  style: const TextStyle(
+                                    fontSize: 12,
+                                    color: AppColors.textSecondary,
+                                  ),
                                 ),
                                 Text(
                                   '${item.cantidad} x ${currencyFormat.format(item.precioUnitario)}',
-                                  style: const TextStyle(fontSize: 12, color: AppColors.textSecondary),
+                                  style: const TextStyle(
+                                    fontSize: 12,
+                                    color: AppColors.textSecondary,
+                                  ),
                                 ),
                               ],
                             ),
                           ),
-                          if ((puedeGestionarVenta || puedeClienteGestionar) && !['COMPLETADA', 'CANCELADA', 'VENCIDA'].contains(reserva.estado)) ...[
+                          if ((puedeGestionarVenta || puedeClienteGestionar) &&
+                              ![
+                                'COMPLETADA',
+                                'CANCELADA',
+                                'VENCIDA',
+                              ].contains(reserva.estado)) ...[
                             const SizedBox(width: 10),
                             SizedBox(
                               width: 88,
                               child: DropdownButtonFormField<int>(
-                                initialValue: _cantidadesVenta[item.id] ?? item.cantidad,
+                                initialValue:
+                                    _cantidadesVenta[item.id] ?? item.cantidad,
                                 decoration: const InputDecoration(
                                   labelText: 'Se lleva',
-                                  contentPadding: EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+                                  contentPadding: EdgeInsets.symmetric(
+                                    horizontal: 8,
+                                    vertical: 6,
+                                  ),
                                 ),
                                 items: List.generate(
                                   item.cantidad + 1,
@@ -408,14 +515,20 @@ class _ReservaDetalleScreenState extends State<ReservaDetalleScreen> {
                                   ),
                                 ),
                                 onChanged: (value) {
-                                  setState(() => _cantidadesVenta[item.id] = value ?? 0);
+                                  setState(
+                                    () =>
+                                        _cantidadesVenta[item.id] = value ?? 0,
+                                  );
                                 },
                               ),
                             ),
                           ],
                           Text(
                             currencyFormat.format(item.subtotal),
-                            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+                            style: const TextStyle(
+                              fontWeight: FontWeight.bold,
+                              fontSize: 14,
+                            ),
                           ),
                         ],
                       ),
@@ -435,16 +548,34 @@ class _ReservaDetalleScreenState extends State<ReservaDetalleScreen> {
                       Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
-                          const Text('Valor de prendas:', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600)),
-                          Text(currencyFormat.format(reserva.total), style: const TextStyle(fontWeight: FontWeight.w800)),
+                          const Text(
+                            'Valor de prendas:',
+                            style: TextStyle(
+                              fontSize: 15,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                          Text(
+                            currencyFormat.format(reserva.total),
+                            style: const TextStyle(fontWeight: FontWeight.w800),
+                          ),
                         ],
                       ),
                       const SizedBox(height: 8),
                       Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
-                          const Text('Anticipo:', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600)),
-                          Text(currencyFormat.format(reserva.montoReserva), style: const TextStyle(fontWeight: FontWeight.w800)),
+                          const Text(
+                            'Anticipo:',
+                            style: TextStyle(
+                              fontSize: 15,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                          Text(
+                            currencyFormat.format(reserva.montoReserva),
+                            style: const TextStyle(fontWeight: FontWeight.w800),
+                          ),
                         ],
                       ),
                     ],
@@ -461,12 +592,19 @@ class _ReservaDetalleScreenState extends State<ReservaDetalleScreen> {
                       children: [
                         Text(
                           'PAGAR ANTICIPO',
-                          style: TextStyle(fontSize: 12, fontWeight: FontWeight.w800, letterSpacing: 0.6, color: AppColors.textSecondary),
+                          style: TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w800,
+                            letterSpacing: 0.6,
+                            color: AppColors.textSecondary,
+                          ),
                         ),
                         const SizedBox(height: 8),
                         Text(
-                          'Esta reserva requiere ${currencyFormat.format(reserva.montoReserva)} de anticipo no reembolsable.',
-                          style: const TextStyle(color: AppColors.textSecondary),
+                          'Esta reserva requiere ${currencyFormat.format(reserva.montoReserva)} de anticipo de una reserva anterior.',
+                          style: const TextStyle(
+                            color: AppColors.textSecondary,
+                          ),
                         ),
                         const SizedBox(height: 14),
                         CustomButton(
@@ -478,7 +616,12 @@ class _ReservaDetalleScreenState extends State<ReservaDetalleScreen> {
                     ),
                   ),
                 ),
-              ] else if ((puedeGestionarVenta || puedeClienteGestionar) && !['COMPLETADA', 'CANCELADA', 'VENCIDA'].contains(reserva.estado)) ...[
+              ] else if ((puedeGestionarVenta || puedeClienteGestionar) &&
+                  ![
+                    'COMPLETADA',
+                    'CANCELADA',
+                    'VENCIDA',
+                  ].contains(reserva.estado)) ...[
                 const SizedBox(height: 16),
                 Card(
                   child: Padding(
@@ -487,47 +630,101 @@ class _ReservaDetalleScreenState extends State<ReservaDetalleScreen> {
                       crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
                         Text(
-                          puedeGestionarVenta ? 'CERRAR COMO VENTA PRESENCIAL' : 'ELEGIR PRENDAS Y PAGAR',
-                          style: TextStyle(fontSize: 12, fontWeight: FontWeight.w800, letterSpacing: 0.6, color: AppColors.textSecondary),
+                          puedeGestionarVenta
+                              ? 'CERRAR COMO VENTA PRESENCIAL'
+                              : 'ELEGIR PRENDAS Y PAGAR',
+                          style: TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w800,
+                            letterSpacing: 0.6,
+                            color: AppColors.textSecondary,
+                          ),
                         ),
                         const SizedBox(height: 12),
                         DropdownButtonFormField<String>(
                           initialValue: _metodoPago,
-                          decoration: const InputDecoration(labelText: 'Método de pago'),
+                          decoration: const InputDecoration(
+                            labelText: 'Método de pago',
+                          ),
                           items: puedeGestionarVenta
                               ? const [
-                                  DropdownMenuItem(value: 'EFECTIVO', child: Text('Efectivo')),
-                                  DropdownMenuItem(value: 'TARJETA', child: Text('Tarjeta')),
-                                  DropdownMenuItem(value: 'QR', child: Text('QR')),
-                                  DropdownMenuItem(value: 'TRANSFERENCIA', child: Text('Transferencia')),
+                                  DropdownMenuItem(
+                                    value: 'EFECTIVO',
+                                    child: Text('Efectivo'),
+                                  ),
+                                  DropdownMenuItem(
+                                    value: 'TARJETA',
+                                    child: Text('Tarjeta'),
+                                  ),
+                                  DropdownMenuItem(
+                                    value: 'QR',
+                                    child: Text('QR'),
+                                  ),
+                                  DropdownMenuItem(
+                                    value: 'TRANSFERENCIA',
+                                    child: Text('Transferencia'),
+                                  ),
                                 ]
                               : const [
-                                  DropdownMenuItem(value: 'STRIPE', child: Text('Stripe')),
-                                  DropdownMenuItem(value: 'QR', child: Text('QR')),
-                                  DropdownMenuItem(value: 'EFECTIVO', child: Text('Efectivo')),
+                                  DropdownMenuItem(
+                                    value: 'STRIPE',
+                                    child: Text('Stripe'),
+                                  ),
+                                  DropdownMenuItem(
+                                    value: 'QR',
+                                    child: Text('QR'),
+                                  ),
+                                  DropdownMenuItem(
+                                    value: 'EFECTIVO',
+                                    child: Text('Efectivo'),
+                                  ),
                                 ],
-                          onChanged: (value) => setState(() => _metodoPago = value ?? 'EFECTIVO'),
+                          onChanged: (value) =>
+                              setState(() => _metodoPago = value ?? 'EFECTIVO'),
                         ),
                         const SizedBox(height: 10),
                         TextField(
                           controller: _observacionVentaCtrl,
                           maxLines: 2,
-                          decoration: const InputDecoration(labelText: 'Observación', hintText: 'Opcional'),
+                          decoration: const InputDecoration(
+                            labelText: 'Observación',
+                            hintText: 'Opcional',
+                          ),
                         ),
                         const SizedBox(height: 12),
-                        _buildRow(Icons.shopping_bag_outlined, 'Subtotal elegido', currencyFormat.format(_subtotalSeleccionado(reserva))),
+                        _buildRow(
+                          Icons.shopping_bag_outlined,
+                          'Subtotal elegido',
+                          currencyFormat.format(_subtotalSeleccionado(reserva)),
+                        ),
                         const SizedBox(height: 8),
-                        _buildRow(Icons.discount_outlined, 'Anticipo aplicado', '-${currencyFormat.format(_anticipoAplicado(reserva))}'),
+                        _buildRow(
+                          Icons.discount_outlined,
+                          'Anticipo aplicado',
+                          '-${currencyFormat.format(_anticipoAplicado(reserva))}',
+                        ),
                         const SizedBox(height: 8),
-                        _buildRow(Icons.payments_outlined, 'Saldo a cobrar', currencyFormat.format(_saldoVenta(reserva))),
+                        _buildRow(
+                          Icons.payments_outlined,
+                          'Saldo a cobrar',
+                          currencyFormat.format(_saldoVenta(reserva)),
+                        ),
                         const SizedBox(height: 14),
                         CustomButton(
                           text: puedeGestionarVenta
                               ? 'Finalizar venta presencial'
-                              : (_metodoPago == 'STRIPE' ? 'Pagar reserva con Stripe' : _metodoPago == 'QR' ? 'Generar QR de pago' : 'Completar reserva'),
-                          icon: puedeGestionarVenta ? Icons.point_of_sale_outlined : Icons.shopping_bag_outlined,
+                              : (_metodoPago == 'STRIPE'
+                                    ? 'Pagar reserva con Stripe'
+                                    : _metodoPago == 'QR'
+                                    ? 'Generar QR de pago'
+                                    : 'Completar reserva'),
+                          icon: puedeGestionarVenta
+                              ? Icons.point_of_sale_outlined
+                              : Icons.shopping_bag_outlined,
                           onPressed: _puedeFinalizar(reserva)
-                              ? () => puedeGestionarVenta ? _finalizarVenta(reserva) : _finalizarMiReserva(reserva)
+                              ? () => puedeGestionarVenta
+                                    ? _finalizarVenta(reserva)
+                                    : _finalizarMiReserva(reserva)
                               : null,
                         ),
                       ],
@@ -538,7 +735,7 @@ class _ReservaDetalleScreenState extends State<ReservaDetalleScreen> {
               const SizedBox(height: 24),
 
               // Botón de Cancelar si está PENDIENTE
-              if (reserva.puedeCancelar)
+              if (reserva.puedeCancelar && !puedeGestionarVenta)
                 CustomButton(
                   text: 'Cancelar Reserva',
                   isOutlined: true,
@@ -566,7 +763,11 @@ class _ReservaDetalleScreenState extends State<ReservaDetalleScreen> {
         Expanded(
           child: Text(
             value,
-            style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: AppColors.textPrimary),
+            style: const TextStyle(
+              fontSize: 13,
+              fontWeight: FontWeight.w600,
+              color: AppColors.textPrimary,
+            ),
           ),
         ),
       ],

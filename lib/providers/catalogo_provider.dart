@@ -1,6 +1,5 @@
 import '../core/session/contexto_sesion.dart';
 
-
 import '../core/constants/api_constants.dart';
 import '../core/network/api_client.dart';
 import '../core/network/api_exceptions.dart';
@@ -12,6 +11,27 @@ class CatalogoProvider extends SessionBoundNotifier {
   List<CatalogoDisponibilidad> _disponibilidad = [];
   List<CatalogoSucursal> _sucursales = [];
   List<CatalogoCategoria> _categorias = [];
+  List<CatalogoTalla> tallas = [];
+  List<CatalogoColor> colores = [];
+  List<CatalogoCategoria> temporadas = [];
+  List<CatalogoCategoria> colecciones = [];
+  int? tallaId, colorId, temporadaId, coleccionId;
+  double? precioMin, precioMax;
+  String orden = 'relevancia';
+  int _pagina = 1;
+  int _total = 0;
+  int _solicitud = 0;
+  int get pagina => _pagina;
+  int get total => _total;
+  int get paginas => (_total / 24).ceil().clamp(1, 1000000);
+  bool get tieneFiltrosAvanzados =>
+      tallaId != null ||
+      colorId != null ||
+      temporadaId != null ||
+      coleccionId != null ||
+      precioMin != null ||
+      precioMax != null ||
+      orden != 'relevancia';
 
   bool _cargando = false;
   bool _cargandoDetalle = false;
@@ -39,7 +59,8 @@ class CatalogoProvider extends SessionBoundNotifier {
   int? get filtroSucursalId => _filtroSucursalId;
   bool get filtroSoloDisponibles => _filtroSoloDisponibles;
 
-  Future<void> cargarPrendas() async {
+  Future<void> cargarPrendas({int pagina = 1}) async {
+    final solicitud = ++_solicitud;
     _cargando = true;
     _error = null;
     notifyListeners();
@@ -54,7 +75,19 @@ class CatalogoProvider extends SessionBoundNotifier {
         queryParams['sucursal_id'] = _filtroSucursalId.toString();
       }
       if (_filtroSoloDisponibles) queryParams['solo_disponibles'] = 'true';
-      queryParams['por_pagina'] = '50';
+      queryParams['por_pagina'] = '24';
+      queryParams['pagina'] = pagina.toString();
+      queryParams['orden'] = orden;
+      if (tallaId != null) queryParams['talla_id'] = tallaId.toString();
+      if (colorId != null) queryParams['color_id'] = colorId.toString();
+      if (temporadaId != null) {
+        queryParams['temporada_id'] = temporadaId.toString();
+      }
+      if (coleccionId != null) {
+        queryParams['coleccion_id'] = coleccionId.toString();
+      }
+      if (precioMin != null) queryParams['precio_min'] = precioMin.toString();
+      if (precioMax != null) queryParams['precio_max'] = precioMax.toString();
 
       final res = await ApiClient.get(
         ApiConstants.catalogoPrendas,
@@ -62,6 +95,9 @@ class CatalogoProvider extends SessionBoundNotifier {
         withAuth: false,
       );
 
+      if (solicitud != _solicitud) return;
+      _pagina = pagina;
+      _total = int.tryParse(res['total'].toString()) ?? 0;
       final items =
           (res['items'] as List<dynamic>?)
               ?.map(
@@ -73,6 +109,7 @@ class CatalogoProvider extends SessionBoundNotifier {
       _cargando = false;
       notifyListeners();
     } catch (e) {
+      if (solicitud != _solicitud) return;
       _cargando = false;
       _error = e is ApiException ? e.message : e.toString();
       notifyListeners();
@@ -149,6 +186,32 @@ class CatalogoProvider extends SessionBoundNotifier {
         withAuth: false,
       );
       if (res is Map<String, dynamic>) {
+        tallas = (res['tallas'] as List? ?? [])
+            .map(
+              (e) =>
+                  CatalogoTalla.fromJson(Map<String, dynamic>.from(e as Map)),
+            )
+            .toList();
+        colores = (res['colores'] as List? ?? [])
+            .map(
+              (e) =>
+                  CatalogoColor.fromJson(Map<String, dynamic>.from(e as Map)),
+            )
+            .toList();
+        temporadas = (res['temporadas'] as List? ?? [])
+            .map(
+              (e) => CatalogoCategoria.fromJson(
+                Map<String, dynamic>.from(e as Map),
+              ),
+            )
+            .toList();
+        colecciones = (res['colecciones'] as List? ?? [])
+            .map(
+              (e) => CatalogoCategoria.fromJson(
+                Map<String, dynamic>.from(e as Map),
+              ),
+            )
+            .toList();
         if (res['categorias'] != null) {
           _categorias = (res['categorias'] as List<dynamic>)
               .map((e) => CatalogoCategoria.fromJson(e as Map<String, dynamic>))
@@ -188,7 +251,39 @@ class CatalogoProvider extends SessionBoundNotifier {
     cargarPrendas();
   }
 
+  void aplicarFiltrosAvanzados({
+    int? talla,
+    int? color,
+    int? temporada,
+    int? coleccion,
+    double? minimo,
+    double? maximo,
+    String ordenElegido = 'relevancia',
+  }) {
+    tallaId = talla;
+    colorId = color;
+    temporadaId = temporada;
+    coleccionId = coleccion;
+    precioMin = minimo;
+    precioMax = maximo;
+    orden = ordenElegido;
+    cargarPrendas();
+  }
+
+  void irPagina(int numero) {
+    if (!_cargando && numero >= 1 && numero <= paginas) {
+      cargarPrendas(pagina: numero);
+    }
+  }
+
   void limpiarFiltros() {
+    tallaId = null;
+    colorId = null;
+    temporadaId = null;
+    coleccionId = null;
+    precioMin = null;
+    precioMax = null;
+    orden = 'relevancia';
     _filtroBusqueda = '';
     _filtroCategoriaId = null;
     _filtroSucursalId = null;

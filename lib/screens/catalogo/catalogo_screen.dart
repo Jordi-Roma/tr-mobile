@@ -1,3 +1,5 @@
+import 'filtros_catalogo_sheet.dart';
+
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
@@ -328,6 +330,20 @@ class _CatalogoScreenState extends State<CatalogoScreen> {
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
               child: Row(
                 children: [
+                  OutlinedButton.icon(
+                    onPressed: () {
+                      setState(() => _modoParaTi = false);
+                      showModalBottomSheet<void>(
+                        context: context,
+                        isScrollControlled: true,
+                        builder: (_) =>
+                            FiltrosCatalogoSheet(catalogo: catalogo),
+                      );
+                    },
+                    icon: const Icon(Icons.tune),
+                    label: const Text('Más filtros'),
+                  ),
+                  const SizedBox(width: 8),
                   if (catalogo.sucursales.isNotEmpty) ...[
                     FilterChip(
                       label: const Text('Todas las sucursales'),
@@ -418,7 +434,8 @@ class _CatalogoScreenState extends State<CatalogoScreen> {
                       ),
                     ),
                   ),
-                  if (catalogo.filtroCategoriaId != null ||
+                  if (catalogo.tieneFiltrosAvanzados ||
+                      catalogo.filtroCategoriaId != null ||
                       catalogo.filtroSucursalId != null ||
                       catalogo.filtroSoloDisponibles ||
                       catalogo.filtroBusqueda.isNotEmpty) ...[
@@ -464,6 +481,37 @@ class _CatalogoScreenState extends State<CatalogoScreen> {
                 child: _modoParaTi ? _buildParaTiGrid() : _buildGrid(catalogo),
               ),
             ),
+            if (!_modoParaTi)
+              SafeArea(
+                top: false,
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    IconButton(
+                      tooltip: 'Página anterior',
+                      onPressed: catalogo.cargando || catalogo.pagina <= 1
+                          ? null
+                          : () => catalogo.irPagina(catalogo.pagina - 1),
+                      icon: const Icon(Icons.chevron_left),
+                    ),
+                    Flexible(
+                      child: Text(
+                        'Página ${catalogo.pagina} de ${catalogo.paginas} · ${catalogo.total} prendas',
+                        textAlign: TextAlign.center,
+                      ),
+                    ),
+                    IconButton(
+                      tooltip: 'Página siguiente',
+                      onPressed:
+                          catalogo.cargando ||
+                              catalogo.pagina >= catalogo.paginas
+                          ? null
+                          : () => catalogo.irPagina(catalogo.pagina + 1),
+                      icon: const Icon(Icons.chevron_right),
+                    ),
+                  ],
+                ),
+              ),
           ],
         ),
       ),

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+
 import '../core/constants/app_colors.dart';
 import 'custom_button.dart';
 
@@ -21,9 +22,10 @@ class EmptyState extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Center(
-      child: Padding(
+      child: SingleChildScrollView(
         padding: const EdgeInsets.symmetric(horizontal: 32),
         child: Column(
+          mainAxisSize: MainAxisSize.min,
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
             Container(
@@ -57,10 +59,7 @@ class EmptyState extends StatelessWidget {
             ],
             if (actionText != null && onAction != null) ...[
               const SizedBox(height: 24),
-              CustomButton(
-                text: actionText!,
-                onPressed: onAction,
-              ),
+              CustomButton(text: actionText!, onPressed: onAction),
             ],
           ],
         ),

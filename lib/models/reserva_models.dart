@@ -26,14 +26,21 @@ class ReservaDetalleResponse {
   factory ReservaDetalleResponse.fromJson(Map<String, dynamic> json) {
     return ReservaDetalleResponse(
       id: json['id'] is int ? json['id'] : int.parse(json['id'].toString()),
-      productoVarianteId: json['producto_variante_id'] is int ? json['producto_variante_id'] : int.parse(json['producto_variante_id'].toString()),
-      productoId: json['producto_id'] is int ? json['producto_id'] : int.parse(json['producto_id'].toString()),
+      productoVarianteId: json['producto_variante_id'] is int
+          ? json['producto_variante_id']
+          : int.parse(json['producto_variante_id'].toString()),
+      productoId: json['producto_id'] is int
+          ? json['producto_id']
+          : int.parse(json['producto_id'].toString()),
       producto: json['producto'] ?? '',
       categoria: json['categoria'] ?? '',
       talla: json['talla'] ?? '',
       color: json['color'] ?? '',
-      cantidad: json['cantidad'] is int ? json['cantidad'] : int.parse(json['cantidad'].toString()),
-      precioUnitario: double.tryParse(json['precio_unitario']?.toString() ?? '0') ?? 0.0,
+      cantidad: json['cantidad'] is int
+          ? json['cantidad']
+          : int.parse(json['cantidad'].toString()),
+      precioUnitario:
+          double.tryParse(json['precio_unitario']?.toString() ?? '0') ?? 0.0,
       subtotal: double.tryParse(json['subtotal']?.toString() ?? '0') ?? 0.0,
     );
   }
@@ -48,6 +55,7 @@ class ReservaResponse {
   final String sucursal;
   final String ciudad;
   final String estado;
+  final bool esGratuita;
   final double total;
   final double montoReserva;
   final double montoAplicado;
@@ -69,6 +77,7 @@ class ReservaResponse {
     required this.sucursal,
     required this.ciudad,
     required this.estado,
+    this.esGratuita = false,
     required this.total,
     required this.montoReserva,
     required this.montoAplicado,
@@ -82,29 +91,50 @@ class ReservaResponse {
     required this.detalles,
   });
 
-  bool get puedeCancelar => !['COMPLETADA', 'CANCELADA', 'VENCIDA'].contains(estado);
+  bool get puedeCancelar =>
+      !['COMPLETADA', 'CANCELADA', 'VENCIDA'].contains(estado);
 
   factory ReservaResponse.fromJson(Map<String, dynamic> json) {
     return ReservaResponse(
       id: json['id'] is int ? json['id'] : int.parse(json['id'].toString()),
       codigo: json['codigo'] ?? '',
-      clienteId: json['cliente_id'] is int ? json['cliente_id'] : int.parse(json['cliente_id'].toString()),
+      clienteId: json['cliente_id'] is int
+          ? json['cliente_id']
+          : int.parse(json['cliente_id'].toString()),
       cliente: json['cliente'],
-      sucursalId: json['sucursal_id'] is int ? json['sucursal_id'] : int.parse(json['sucursal_id'].toString()),
+      sucursalId: json['sucursal_id'] is int
+          ? json['sucursal_id']
+          : int.parse(json['sucursal_id'].toString()),
       sucursal: json['sucursal'] ?? '',
       ciudad: json['ciudad'] ?? '',
       estado: json['estado'] ?? 'PENDIENTE',
+      esGratuita: json['es_gratuita'] == true,
       total: double.tryParse(json['total']?.toString() ?? '0') ?? 0.0,
-      montoReserva: double.tryParse(json['monto_reserva']?.toString() ?? '0') ?? 0.0,
-      montoAplicado: double.tryParse(json['monto_aplicado']?.toString() ?? '0') ?? 0.0,
-      anticipoPagado: json['anticipo_pagado'] == true || json['anticipo_pagado']?.toString().toLowerCase() == 'true',
-      anticipoOrdenId: json['anticipo_orden_id'] != null ? int.tryParse(json['anticipo_orden_id'].toString()) : null,
-      ventaId: json['venta_id'] != null ? int.tryParse(json['venta_id'].toString()) : null,
+      montoReserva:
+          double.tryParse(json['monto_reserva']?.toString() ?? '0') ?? 0.0,
+      montoAplicado:
+          double.tryParse(json['monto_aplicado']?.toString() ?? '0') ?? 0.0,
+      anticipoPagado:
+          json['anticipo_pagado'] == true ||
+          json['anticipo_pagado']?.toString().toLowerCase() == 'true',
+      anticipoOrdenId: json['anticipo_orden_id'] != null
+          ? int.tryParse(json['anticipo_orden_id'].toString())
+          : null,
+      ventaId: json['venta_id'] != null
+          ? int.tryParse(json['venta_id'].toString())
+          : null,
       fechaCita: json['fecha_cita']?.toString(),
       fechaReserva: json['fecha_reserva'] ?? '',
       fechaExpiracion: json['fecha_expiracion'],
       observacion: json['observacion'],
-      detalles: (json['detalles'] as List<dynamic>?)?.map((e) => ReservaDetalleResponse.fromJson(e as Map<String, dynamic>)).toList() ?? [],
+      detalles:
+          (json['detalles'] as List<dynamic>?)
+              ?.map(
+                (e) =>
+                    ReservaDetalleResponse.fromJson(e as Map<String, dynamic>),
+              )
+              .toList() ??
+          [],
     );
   }
 }
@@ -128,10 +158,16 @@ class ReservaPagoResponse {
 
   factory ReservaPagoResponse.fromJson(Map<String, dynamic> json) {
     return ReservaPagoResponse(
-      reserva: ReservaResponse.fromJson(json['reserva'] as Map<String, dynamic>),
+      reserva: ReservaResponse.fromJson(
+        json['reserva'] as Map<String, dynamic>,
+      ),
       requiereCheckout: json['requiere_checkout'] == true,
-      ordenId: json['orden_id'] != null ? int.tryParse(json['orden_id'].toString()) : null,
-      ventaId: json['venta_id'] != null ? int.tryParse(json['venta_id'].toString()) : null,
+      ordenId: json['orden_id'] != null
+          ? int.tryParse(json['orden_id'].toString())
+          : null,
+      ventaId: json['venta_id'] != null
+          ? int.tryParse(json['venta_id'].toString())
+          : null,
       checkoutUrl: json['checkout_url']?.toString(),
       mensaje: json['mensaje']?.toString(),
     );

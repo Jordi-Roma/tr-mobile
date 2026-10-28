@@ -1,6 +1,9 @@
+import '../../providers/auth_provider.dart';
+
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
+
 import '../../core/constants/app_colors.dart';
 import '../../models/reserva_models.dart';
 import '../../providers/catalogo_provider.dart';
@@ -40,9 +43,27 @@ class _ReservasAdminScreenState extends State<ReservasAdminScreen> {
 
   void _cargar() {
     context.read<ReservaProvider>().cargarReservasAdmin(
-          estado: _filtroEstado,
-          sucursalId: _filtroSucursalId,
-        );
+      estado: _filtroEstado,
+      sucursalId: _filtroSucursalId,
+    );
+  }
+
+  List<String> _transiciones(ReservaResponse reserva) {
+    final siguientes = <String, List<String>>{
+      'PENDIENTE_ANTICIPO': ['CANCELADA'],
+      'PENDIENTE': ['PREPARADA', 'CANCELADA'],
+      'PREPARADA': ['EN_ATENCION', 'CANCELADA'],
+      'EN_ATENCION': ['CANCELADA'],
+    };
+    final roles = context.read<AuthProvider>().usuario?.roles ?? [];
+    final puedeCancelar =
+        roles.contains('ADMINISTRADOR') || roles.contains('ENCARGADO_SUCURSAL');
+    return [
+      reserva.estado,
+      ...?siguientes[reserva.estado]?.where(
+        (e) => e != 'CANCELADA' || puedeCancelar,
+      ),
+    ];
   }
 
   void _abrirCambioEstado(ReservaResponse reserva) {
@@ -71,12 +92,15 @@ class _ReservasAdminScreenState extends State<ReservasAdminScreen> {
               const SizedBox(height: 6),
               Text(
                 'Cliente: ${reserva.cliente ?? "Desconocido"} • Total: Bs. ${reserva.total}',
-                style: const TextStyle(fontSize: 13, color: AppColors.textSecondary),
+                style: const TextStyle(
+                  fontSize: 13,
+                  color: AppColors.textSecondary,
+                ),
               ),
               const SizedBox(height: 16),
               const Divider(),
               const SizedBox(height: 12),
-              ..._estados.map((estado) {
+              ..._transiciones(reserva).map((estado) {
                 final isCurrent = reserva.estado == estado;
                 return ListTile(
                   contentPadding: EdgeInsets.zero,
@@ -84,19 +108,29 @@ class _ReservasAdminScreenState extends State<ReservasAdminScreen> {
                   title: Text(
                     estado.replaceAll('_', ' '),
                     style: TextStyle(
-                      fontWeight: isCurrent ? FontWeight.bold : FontWeight.normal,
-                      color: isCurrent ? AppColors.primary : AppColors.textPrimary,
+                      fontWeight: isCurrent
+                          ? FontWeight.bold
+                          : FontWeight.normal,
+                      color: isCurrent
+                          ? AppColors.primary
+                          : AppColors.textPrimary,
                     ),
                   ),
-                  trailing: isCurrent ? const Icon(Icons.check, color: AppColors.primary) : null,
+                  trailing: isCurrent
+                      ? const Icon(Icons.check, color: AppColors.primary)
+                      : null,
                   onTap: () async {
                     Navigator.of(ctx).pop();
-                    final ok = await context.read<ReservaProvider>().cambiarEstado(reserva.id, estado);
+                    final ok = await context
+                        .read<ReservaProvider>()
+                        .cambiarEstado(reserva.id, estado);
                     if (ok && mounted) {
                       _cargar();
                       ScaffoldMessenger.of(context).showSnackBar(
                         SnackBar(
-                          content: Text('Estado actualizado a ${estado.replaceAll("_", " ")}'),
+                          content: Text(
+                            'Estado actualizado a ${estado.replaceAll("_", " ")}',
+                          ),
                           backgroundColor: AppColors.success,
                         ),
                       );
@@ -115,12 +149,13 @@ class _ReservasAdminScreenState extends State<ReservasAdminScreen> {
   Widget build(BuildContext context) {
     final reservaProv = context.watch<ReservaProvider>();
     final catalogo = context.watch<CatalogoProvider>();
-    final currencyFormat = NumberFormat.currency(locale: 'es_BO', symbol: 'Bs. ');
+    final currencyFormat = NumberFormat.currency(
+      locale: 'es_BO',
+      symbol: 'Bs. ',
+    );
 
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Gestión de Reservas'),
-      ),
+      appBar: AppBar(title: const Text('Gestión de Reservas')),
       body: SafeArea(
         child: Column(
           children: [
@@ -135,7 +170,9 @@ class _ReservasAdminScreenState extends State<ReservasAdminScreen> {
                     selected: _filtroEstado == null,
                     selectedColor: AppColors.primary,
                     labelStyle: TextStyle(
-                      color: _filtroEstado == null ? Colors.white : AppColors.textPrimary,
+                      color: _filtroEstado == null
+                          ? Colors.white
+                          : AppColors.textPrimary,
                       fontSize: 12,
                     ),
                     onSelected: (_) {
@@ -153,11 +190,15 @@ class _ReservasAdminScreenState extends State<ReservasAdminScreen> {
                         selected: selected,
                         selectedColor: AppColors.getStatusColor(estado),
                         labelStyle: TextStyle(
-                          color: selected ? Colors.white : AppColors.textPrimary,
+                          color: selected
+                              ? Colors.white
+                              : AppColors.textPrimary,
                           fontSize: 12,
                         ),
                         onSelected: (_) {
-                          setState(() => _filtroEstado = selected ? null : estado);
+                          setState(
+                            () => _filtroEstado = selected ? null : estado,
+                          );
                           _cargar();
                         },
                       ),
@@ -168,9 +209,12 @@ class _ReservasAdminScreenState extends State<ReservasAdminScreen> {
             ),
 
             // Filtro por Sucursal (para Administrador)
-            if (catalogo.sucursales.isNotEmpty)
+            if (context.watch<AuthProvider>().esAdmin && catalogo.sucursales.isNotEmpty)
               Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 4,
+                ),
                 child: Container(
                   padding: const EdgeInsets.symmetric(horizontal: 12),
                   decoration: BoxDecoration(
@@ -182,16 +226,25 @@ class _ReservasAdminScreenState extends State<ReservasAdminScreen> {
                     child: DropdownButton<int?>(
                       value: _filtroSucursalId,
                       isExpanded: true,
-                      hint: const Text('Filtrar por sucursal', style: TextStyle(fontSize: 13)),
+                      hint: const Text(
+                        'Filtrar por sucursal',
+                        style: TextStyle(fontSize: 13),
+                      ),
                       items: [
                         const DropdownMenuItem<int?>(
                           value: null,
-                          child: Text('Todas las sucursales', style: TextStyle(fontSize: 13)),
+                          child: Text(
+                            'Todas las sucursales',
+                            style: TextStyle(fontSize: 13),
+                          ),
                         ),
                         ...catalogo.sucursales.map((s) {
                           return DropdownMenuItem<int?>(
                             value: s.id,
-                            child: Text('${s.nombre} (${s.ciudad})', style: const TextStyle(fontSize: 13)),
+                            child: Text(
+                              '${s.nombre} (${s.ciudad})',
+                              style: const TextStyle(fontSize: 13),
+                            ),
                           );
                         }),
                       ],
@@ -212,7 +265,8 @@ class _ReservasAdminScreenState extends State<ReservasAdminScreen> {
                 onRefresh: () async => _cargar(),
                 child: Builder(
                   builder: (context) {
-                    if (reservaProv.cargando && reservaProv.reservasAdmin.isEmpty) {
+                    if (reservaProv.cargando &&
+                        reservaProv.reservasAdmin.isEmpty) {
                       return const Center(child: CircularProgressIndicator());
                     }
 
@@ -235,7 +289,8 @@ class _ReservasAdminScreenState extends State<ReservasAdminScreen> {
                     return ListView.separated(
                       padding: const EdgeInsets.all(16),
                       itemCount: reservaProv.reservasAdmin.length,
-                      separatorBuilder: (context, index) => const SizedBox(height: 12),
+                      separatorBuilder: (context, index) =>
+                          const SizedBox(height: 12),
                       itemBuilder: (context, index) {
                         final reserva = reservaProv.reservasAdmin[index];
                         return Card(
@@ -244,7 +299,9 @@ class _ReservasAdminScreenState extends State<ReservasAdminScreen> {
                             onTap: () {
                               Navigator.of(context).push(
                                 MaterialPageRoute(
-                                  builder: (_) => ReservaDetalleScreen(reservaId: reserva.id),
+                                  builder: (_) => ReservaDetalleScreen(
+                                    reservaId: reserva.id,
+                                  ),
                                 ),
                               );
                             },
@@ -254,7 +311,8 @@ class _ReservasAdminScreenState extends State<ReservasAdminScreen> {
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
                                   Row(
-                                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                    mainAxisAlignment:
+                                        MainAxisAlignment.spaceBetween,
                                     children: [
                                       Text(
                                         reserva.codigo,
@@ -271,34 +329,56 @@ class _ReservasAdminScreenState extends State<ReservasAdminScreen> {
                                   if (reserva.cliente != null)
                                     Row(
                                       children: [
-                                        const Icon(Icons.person_outline, size: 16, color: AppColors.textSecondary),
+                                        const Icon(
+                                          Icons.person_outline,
+                                          size: 16,
+                                          color: AppColors.textSecondary,
+                                        ),
                                         const SizedBox(width: 6),
                                         Text(
                                           reserva.cliente!,
-                                          style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
+                                          style: const TextStyle(
+                                            fontSize: 13,
+                                            fontWeight: FontWeight.w600,
+                                          ),
                                         ),
                                       ],
                                     ),
                                   const SizedBox(height: 4),
                                   Row(
                                     children: [
-                                      const Icon(Icons.storefront_outlined, size: 16, color: AppColors.textSecondary),
+                                      const Icon(
+                                        Icons.storefront_outlined,
+                                        size: 16,
+                                        color: AppColors.textSecondary,
+                                      ),
                                       const SizedBox(width: 6),
                                       Text(
                                         '${reserva.sucursal} (${reserva.ciudad})',
-                                        style: const TextStyle(fontSize: 12, color: AppColors.textSecondary),
+                                        style: const TextStyle(
+                                          fontSize: 12,
+                                          color: AppColors.textSecondary,
+                                        ),
                                       ),
                                     ],
                                   ),
-                                  if (reserva.fechaCita != null && reserva.fechaCita!.isNotEmpty) ...[
+                                  if (reserva.fechaCita != null &&
+                                      reserva.fechaCita!.isNotEmpty) ...[
                                     const SizedBox(height: 4),
                                     Row(
                                       children: [
-                                        const Icon(Icons.event_available_outlined, size: 16, color: AppColors.textSecondary),
+                                        const Icon(
+                                          Icons.event_available_outlined,
+                                          size: 16,
+                                          color: AppColors.textSecondary,
+                                        ),
                                         const SizedBox(width: 6),
                                         Text(
                                           'Cita: ${reserva.fechaCita} · Anticipo: ${currencyFormat.format(reserva.montoReserva)}',
-                                          style: const TextStyle(fontSize: 12, color: AppColors.textSecondary),
+                                          style: const TextStyle(
+                                            fontSize: 12,
+                                            color: AppColors.textSecondary,
+                                          ),
                                         ),
                                       ],
                                     ),
@@ -307,20 +387,34 @@ class _ReservasAdminScreenState extends State<ReservasAdminScreen> {
                                   const Divider(),
                                   const SizedBox(height: 8),
                                   Row(
-                                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                    mainAxisAlignment:
+                                        MainAxisAlignment.spaceBetween,
                                     children: [
                                       Text(
                                         currencyFormat.format(reserva.total),
-                                        style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                                        style: const TextStyle(
+                                          fontSize: 16,
+                                          fontWeight: FontWeight.bold,
+                                        ),
                                       ),
                                       ElevatedButton.icon(
-                                        icon: const Icon(Icons.swap_horiz, size: 16),
+                                        icon: const Icon(
+                                          Icons.swap_horiz,
+                                          size: 16,
+                                        ),
                                         label: const Text('Cambiar Estado'),
                                         style: ElevatedButton.styleFrom(
-                                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                                          textStyle: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
+                                          padding: const EdgeInsets.symmetric(
+                                            horizontal: 12,
+                                            vertical: 8,
+                                          ),
+                                          textStyle: const TextStyle(
+                                            fontSize: 12,
+                                            fontWeight: FontWeight.bold,
+                                          ),
                                         ),
-                                        onPressed: () => _abrirCambioEstado(reserva),
+                                        onPressed: () =>
+                                            _abrirCambioEstado(reserva),
                                       ),
                                     ],
                                   ),

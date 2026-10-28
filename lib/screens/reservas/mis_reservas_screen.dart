@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
+
 import '../../core/constants/app_colors.dart';
 import '../../models/reserva_models.dart';
 import '../../providers/auth_provider.dart';
@@ -36,7 +37,9 @@ class _MisReservasScreenState extends State<MisReservasScreen> {
       context: context,
       builder: (ctx) => AlertDialog(
         title: const Text('¿Cancelar Reserva?'),
-        content: Text('¿Estás seguro de cancelar la reserva ${reserva.codigo}? El stock será liberado.'),
+        content: Text(
+          '¿Estás seguro de cancelar la reserva ${reserva.codigo}? El stock será liberado.',
+        ),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(ctx).pop(),
@@ -46,7 +49,9 @@ class _MisReservasScreenState extends State<MisReservasScreen> {
             style: ElevatedButton.styleFrom(backgroundColor: AppColors.danger),
             onPressed: () async {
               Navigator.of(ctx).pop();
-              final ok = await context.read<ReservaProvider>().cancelarReserva(reserva.id);
+              final ok = await context.read<ReservaProvider>().cancelarReserva(
+                reserva.id,
+              );
               if (ok && mounted) {
                 ScaffoldMessenger.of(context).showSnackBar(
                   const SnackBar(
@@ -67,7 +72,10 @@ class _MisReservasScreenState extends State<MisReservasScreen> {
   Widget build(BuildContext context) {
     final auth = context.watch<AuthProvider>();
     final reservaProv = context.watch<ReservaProvider>();
-    final currencyFormat = NumberFormat.currency(locale: 'es_BO', symbol: 'Bs. ');
+    final currencyFormat = NumberFormat.currency(
+      locale: 'es_BO',
+      symbol: 'Bs. ',
+    );
 
     if (!auth.estaAutenticado) {
       return Scaffold(
@@ -78,18 +86,15 @@ class _MisReservasScreenState extends State<MisReservasScreen> {
           subtitle: 'Consulta el estado de tus apartados de prendas y prepara tu visita a tienda.',
           actionText: 'Iniciar Sesión',
           onAction: () {
-            Navigator.of(context).push(
-              MaterialPageRoute(builder: (_) => const LoginScreen()),
-            );
+            Navigator.of(context)
+                .push(MaterialPageRoute(builder: (_) => const LoginScreen()));
           },
         ),
       );
     }
 
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Mis Reservas'),
-      ),
+      appBar: AppBar(title: const Text('Mis Reservas')),
       body: SafeArea(
         child: RefreshIndicator(
           onRefresh: () => reservaProv.cargarMisReservas(),
@@ -112,7 +117,8 @@ class _MisReservasScreenState extends State<MisReservasScreen> {
               return ListView.separated(
                 padding: const EdgeInsets.all(16),
                 itemCount: reservaProv.misReservas.length,
-                separatorBuilder: (context, index) => const SizedBox(height: 12),
+                separatorBuilder: (context, index) =>
+                    const SizedBox(height: 12),
                 itemBuilder: (context, index) {
                   final reserva = reservaProv.misReservas[index];
                   return Card(
@@ -121,7 +127,8 @@ class _MisReservasScreenState extends State<MisReservasScreen> {
                       onTap: () {
                         Navigator.of(context).push(
                           MaterialPageRoute(
-                            builder: (_) => ReservaDetalleScreen(reservaId: reserva.id),
+                            builder: (_) =>
+                                ReservaDetalleScreen(reservaId: reserva.id),
                           ),
                         );
                       },
@@ -151,12 +158,19 @@ class _MisReservasScreenState extends State<MisReservasScreen> {
                             // Sucursal y Fecha
                             Row(
                               children: [
-                                const Icon(Icons.store_outlined, size: 16, color: AppColors.textSecondary),
+                                const Icon(
+                                  Icons.store_outlined,
+                                  size: 16,
+                                  color: AppColors.textSecondary,
+                                ),
                                 const SizedBox(width: 6),
                                 Expanded(
                                   child: Text(
                                     '${reserva.sucursal} (${reserva.ciudad})',
-                                    style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w500),
+                                    style: const TextStyle(
+                                      fontSize: 13,
+                                      fontWeight: FontWeight.w500,
+                                    ),
                                   ),
                                 ),
                               ],
@@ -164,23 +178,38 @@ class _MisReservasScreenState extends State<MisReservasScreen> {
                             const SizedBox(height: 4),
                             Row(
                               children: [
-                                const Icon(Icons.access_time, size: 16, color: AppColors.textSecondary),
+                                const Icon(
+                                  Icons.access_time,
+                                  size: 16,
+                                  color: AppColors.textSecondary,
+                                ),
                                 const SizedBox(width: 6),
                                 Text(
                                   reserva.fechaReserva.substring(0, 10),
-                                  style: const TextStyle(fontSize: 12, color: AppColors.textSecondary),
+                                  style: const TextStyle(
+                                    fontSize: 12,
+                                    color: AppColors.textSecondary,
+                                  ),
                                 ),
                               ],
                             ),
-                            if (reserva.fechaCita != null && reserva.fechaCita!.isNotEmpty) ...[
+                            if (reserva.fechaCita != null &&
+                                reserva.fechaCita!.isNotEmpty) ...[
                               const SizedBox(height: 4),
                               Row(
                                 children: [
-                                  const Icon(Icons.event_available_outlined, size: 16, color: AppColors.textSecondary),
+                                  const Icon(
+                                    Icons.event_available_outlined,
+                                    size: 16,
+                                    color: AppColors.textSecondary,
+                                  ),
                                   const SizedBox(width: 6),
                                   Text(
                                     'Cita: ${reserva.fechaCita}',
-                                    style: const TextStyle(fontSize: 12, color: AppColors.textSecondary),
+                                    style: const TextStyle(
+                                      fontSize: 12,
+                                      color: AppColors.textSecondary,
+                                    ),
                                   ),
                                 ],
                               ),
@@ -196,7 +225,13 @@ class _MisReservasScreenState extends State<MisReservasScreen> {
                                 Column(
                                   crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
-                                    const Text('Valor prendas:', style: TextStyle(fontSize: 11, color: AppColors.textSecondary)),
+                                    const Text(
+                                      'Valor prendas:',
+                                      style: TextStyle(
+                                        fontSize: 11,
+                                        color: AppColors.textSecondary,
+                                      ),
+                                    ),
                                     Text(
                                       currencyFormat.format(reserva.total),
                                       style: const TextStyle(
@@ -206,8 +241,13 @@ class _MisReservasScreenState extends State<MisReservasScreen> {
                                       ),
                                     ),
                                     Text(
-                                      'Anticipo ${currencyFormat.format(reserva.montoReserva)}',
-                                      style: const TextStyle(fontSize: 11, color: AppColors.textSecondary),
+                                      reserva.esGratuita
+                                          ? 'Reserva gratuita · 7 días'
+                                          : 'Anticipo ${currencyFormat.format(reserva.montoReserva)}',
+                                      style: const TextStyle(
+                                        fontSize: 11,
+                                        color: AppColors.textSecondary,
+                                      ),
                                     ),
                                   ],
                                 ),
@@ -215,13 +255,20 @@ class _MisReservasScreenState extends State<MisReservasScreen> {
                                   children: [
                                     if (reserva.puedeCancelar)
                                       TextButton(
-                                        onPressed: () => _confirmarCancelacion(reserva),
+                                        onPressed: () =>
+                                            _confirmarCancelacion(reserva),
                                         child: const Text(
                                           'Cancelar',
-                                          style: TextStyle(color: AppColors.danger, fontSize: 13),
+                                          style: TextStyle(
+                                            color: AppColors.danger,
+                                            fontSize: 13,
+                                          ),
                                         ),
                                       ),
-                                    const Icon(Icons.chevron_right, color: AppColors.textSecondary),
+                                    const Icon(
+                                      Icons.chevron_right,
+                                      color: AppColors.textSecondary,
+                                    ),
                                   ],
                                 ),
                               ],

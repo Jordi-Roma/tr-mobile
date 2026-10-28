@@ -15,6 +15,7 @@ class CarritoItemResponse {
   final double precioUnitario;
   final double subtotal;
   final int stockDisponible;
+  final bool disponibleParaCompra;
 
   CarritoItemResponse({
     required this.id,
@@ -31,24 +32,37 @@ class CarritoItemResponse {
     required this.precioUnitario,
     required this.subtotal,
     required this.stockDisponible,
+    this.disponibleParaCompra = true,
   });
 
   factory CarritoItemResponse.fromJson(Map<String, dynamic> json) {
     return CarritoItemResponse(
       id: json['id'] is int ? json['id'] : int.parse(json['id'].toString()),
-      productoVarianteId: json['producto_variante_id'] is int ? json['producto_variante_id'] : int.parse(json['producto_variante_id'].toString()),
-      productoId: json['producto_id'] is int ? json['producto_id'] : int.parse(json['producto_id'].toString()),
+      productoVarianteId: json['producto_variante_id'] is int
+          ? json['producto_variante_id']
+          : int.parse(json['producto_variante_id'].toString()),
+      productoId: json['producto_id'] is int
+          ? json['producto_id']
+          : int.parse(json['producto_id'].toString()),
       producto: json['producto'] ?? '',
       categoria: json['categoria'] ?? '',
       talla: json['talla'] ?? '',
       color: json['color'] ?? '',
-      sucursalId: json['sucursal_id'] != null ? int.tryParse(json['sucursal_id'].toString()) : null,
+      sucursalId: json['sucursal_id'] != null
+          ? int.tryParse(json['sucursal_id'].toString())
+          : null,
       sucursal: json['sucursal'],
       ciudad: json['ciudad'],
-      cantidad: json['cantidad'] is int ? json['cantidad'] : int.parse(json['cantidad'].toString()),
-      precioUnitario: double.tryParse(json['precio_unitario']?.toString() ?? '0') ?? 0.0,
+      cantidad: json['cantidad'] is int
+          ? json['cantidad']
+          : int.parse(json['cantidad'].toString()),
+      precioUnitario:
+          double.tryParse(json['precio_unitario']?.toString() ?? '0') ?? 0.0,
       subtotal: double.tryParse(json['subtotal']?.toString() ?? '0') ?? 0.0,
-      stockDisponible: json['stock_disponible'] is int ? json['stock_disponible'] : int.tryParse(json['stock_disponible']?.toString() ?? '0') ?? 0,
+      disponibleParaCompra: json['disponible_para_compra'] != false,
+      stockDisponible: json['stock_disponible'] is int
+          ? json['stock_disponible']
+          : int.tryParse(json['stock_disponible']?.toString() ?? '0') ?? 0,
     );
   }
 }
@@ -71,9 +85,16 @@ class CarritoResponse {
   factory CarritoResponse.fromJson(Map<String, dynamic> json) {
     return CarritoResponse(
       id: json['id'] is int ? json['id'] : int.parse(json['id'].toString()),
-      items: (json['items'] as List<dynamic>?)?.map((e) => CarritoItemResponse.fromJson(e as Map<String, dynamic>)).toList() ?? [],
+      items:
+          (json['items'] as List<dynamic>?)
+              ?.map(
+                (e) => CarritoItemResponse.fromJson(e as Map<String, dynamic>),
+              )
+              .toList() ??
+          [],
       total: double.tryParse(json['total']?.toString() ?? '0') ?? 0.0,
-      sucursalesDisponibles: (json['sucursales_disponibles'] as List<dynamic>?)
+      sucursalesDisponibles:
+          (json['sucursales_disponibles'] as List<dynamic>?)
               ?.map((e) => CatalogoSucursal.fromJson(e as Map<String, dynamic>))
               .toList() ??
           [],
