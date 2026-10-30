@@ -70,7 +70,7 @@ class _RecuperarPasswordScreenState extends State<RecuperarPasswordScreen> {
                 ),
                 const SizedBox(height: 12),
                 const Text(
-                  'Recibirás un código en el correo registrado de tu cuenta.',
+                  'Ingresa tu usuario o correo para solicitar un código de recuperación.',
                 ),
                 const SizedBox(height: 20),
                 TextFormField(
