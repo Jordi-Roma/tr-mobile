@@ -1,5 +1,8 @@
+import '../../core/session/contexto_sesion.dart';
+
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+
 import '../../core/constants/app_colors.dart';
 import '../../models/delivery_models.dart';
 import '../../providers/auth_provider.dart';
@@ -10,11 +13,25 @@ class HistorialDeliveryScreen extends StatefulWidget {
   const HistorialDeliveryScreen({super.key});
 
   @override
-  State<HistorialDeliveryScreen> createState() => _HistorialDeliveryScreenState();
+  State<HistorialDeliveryScreen> createState() =>
+      _HistorialDeliveryScreenState();
 }
 
 class _HistorialDeliveryScreenState extends State<HistorialDeliveryScreen> {
   late Future<List<DeliveryItem>> _future;
+  bool _sesionCambio = false;
+  int _generacion = 0;
+  void _cambio() {
+    if (mounted && _generacion != ContextoSesion.instance.generacion) {
+      setState(() => _sesionCambio = true);
+    }
+  }
+
+  @override
+  void dispose() {
+    ContextoSesion.instance.removeListener(_cambio);
+    super.dispose();
+  }
 
   bool _esStaff(BuildContext context) {
     final auth = context.read<AuthProvider>();
@@ -25,11 +42,15 @@ class _HistorialDeliveryScreenState extends State<HistorialDeliveryScreen> {
   @override
   void initState() {
     super.initState();
+    _generacion = ContextoSesion.instance.generacion;
+    ContextoSesion.instance.addListener(_cambio);
     _future = _cargar(context);
   }
 
   Future<List<DeliveryItem>> _cargar(BuildContext context) {
-    return _esStaff(context) ? DeliveryService.listarDeliveries() : DeliveryService.listarMisDeliveries();
+    return _esStaff(context)
+        ? DeliveryService.listarDeliveries()
+        : DeliveryService.listarMisDeliveries();
   }
 
   Future<void> _refrescar() async {
@@ -43,73 +64,96 @@ class _HistorialDeliveryScreenState extends State<HistorialDeliveryScreen> {
   Widget build(BuildContext context) {
     final esStaff = _esStaff(context);
     return Scaffold(
-      appBar: AppBar(title: Text(esStaff ? 'Historial de delivery' : 'Mis deliveries')),
-      body: RefreshIndicator(
-        onRefresh: _refrescar,
-        child: FutureBuilder<List<DeliveryItem>>(
-          future: _future,
-          builder: (context, snapshot) {
-            if (snapshot.connectionState == ConnectionState.waiting) {
-              return const Center(child: CircularProgressIndicator());
-            }
-            if (snapshot.hasError) {
-              return ListView(
-                padding: const EdgeInsets.all(24),
-                children: [
-                  const Icon(Icons.error_outline, color: AppColors.danger, size: 44),
-                  const SizedBox(height: 12),
-                  Text(
-                    snapshot.error.toString(),
-                    textAlign: TextAlign.center,
-                    style: const TextStyle(color: AppColors.textSecondary),
-                  ),
-                ],
-              );
-            }
-            final items = snapshot.data ?? [];
-            if (items.isEmpty) {
-              return const Center(
-                child: Text(
-                  'No hay deliveries para mostrar.',
-                  style: TextStyle(color: AppColors.textSecondary),
-                ),
-              );
-            }
-            return ListView.separated(
-              padding: const EdgeInsets.all(16),
-              itemBuilder: (context, index) {
-                final delivery = items[index];
-                return Card(
-                  child: ListTile(
-                    leading: CircleAvatar(
-                      backgroundColor: AppColors.accentSoft,
-                      child: Icon(_iconoEstado(delivery.estado), color: AppColors.primary),
-                    ),
-                    title: Text(delivery.ventaCodigo ?? 'Venta #${delivery.ventaId}'),
-                    subtitle: Text(
-                      '${delivery.direccionEntrega}\n${delivery.distanciaKm.toStringAsFixed(2)} km · Bs ${delivery.costoDelivery.toStringAsFixed(2)}',
-                    ),
-                    isThreeLine: true,
-                    trailing: Chip(
-                      label: Text(delivery.estado),
-                      visualDensity: VisualDensity.compact,
-                    ),
-                    onTap: () {
-                      Navigator.of(context).push(
-                        MaterialPageRoute(
-                          builder: (_) => DetalleDeliveryScreen(deliveryId: delivery.id, esStaff: esStaff),
+      appBar: AppBar(
+        title: Text(esStaff ? 'Historial de delivery' : 'Mis deliveries'),
+      ),
+      body: _sesionCambio
+          ? const Center(
+              child: Text(
+                'La sesión cambió. Abre las entregas de tu cuenta actual.',
+              ),
+            )
+          : RefreshIndicator(
+              onRefresh: _refrescar,
+              child: FutureBuilder<List<DeliveryItem>>(
+                future: _future,
+                builder: (context, snapshot) {
+                  if (snapshot.connectionState == ConnectionState.waiting) {
+                    return const Center(child: CircularProgressIndicator());
+                  }
+                  if (snapshot.hasError) {
+                    return ListView(
+                      padding: const EdgeInsets.all(24),
+                      children: [
+                        const Icon(
+                          Icons.error_outline,
+                          color: AppColors.danger,
+                          size: 44,
+                        ),
+                        const SizedBox(height: 12),
+                        Text(
+                          snapshot.error.toString(),
+                          textAlign: TextAlign.center,
+                          style: const TextStyle(
+                            color: AppColors.textSecondary,
+                          ),
+                        ),
+                      ],
+                    );
+                  }
+                  final items = snapshot.data ?? [];
+                  if (items.isEmpty) {
+                    return const Center(
+                      child: Text(
+                        'No hay deliveries para mostrar.',
+                        style: TextStyle(color: AppColors.textSecondary),
+                      ),
+                    );
+                  }
+                  return ListView.separated(
+                    padding: const EdgeInsets.all(16),
+                    itemBuilder: (context, index) {
+                      final delivery = items[index];
+                      return Card(
+                        child: ListTile(
+                          leading: CircleAvatar(
+                            backgroundColor: AppColors.accentSoft,
+                            child: Icon(
+                              _iconoEstado(delivery.estado),
+                              color: AppColors.primary,
+                            ),
+                          ),
+                          title: Text(
+                            delivery.ventaCodigo ??
+                                'Venta #${delivery.ventaId}',
+                          ),
+                          subtitle: Text(
+                            '${delivery.direccionEntrega}\n${delivery.distanciaKm.toStringAsFixed(2)} km · Bs ${delivery.costoDelivery.toStringAsFixed(2)}',
+                          ),
+                          isThreeLine: true,
+                          trailing: Chip(
+                            label: Text(delivery.estado),
+                            visualDensity: VisualDensity.compact,
+                          ),
+                          onTap: () {
+                            Navigator.of(context).push(
+                              MaterialPageRoute(
+                                builder: (_) => DetalleDeliveryScreen(
+                                  deliveryId: delivery.id,
+                                  esStaff: esStaff,
+                                ),
+                              ),
+                            );
+                          },
                         ),
                       );
                     },
-                  ),
-                );
-              },
-              separatorBuilder: (_, index) => const SizedBox(height: 10),
-              itemCount: items.length,
-            );
-          },
-        ),
-      ),
+                    separatorBuilder: (_, index) => const SizedBox(height: 10),
+                    itemCount: items.length,
+                  );
+                },
+              ),
+            ),
     );
   }
 

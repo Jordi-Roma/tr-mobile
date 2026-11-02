@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:webview_flutter/webview_flutter.dart';
+
 import '../../core/constants/app_colors.dart';
 import '../../models/pago_models.dart';
 import '../../services/pago_service.dart';
@@ -39,29 +40,31 @@ class _PagoStripeScreenState extends State<PagoStripeScreen> {
   @override
   void initState() {
     super.initState();
-    if (kIsWeb) {
+    if (kIsWeb || !widget.checkoutUrl.startsWith('https://')) {
       _cargando = false;
       return;
     }
 
     _webController = WebViewController()
       ..setJavaScriptMode(JavaScriptMode.unrestricted)
-      ..setNavigationDelegate(NavigationDelegate(
-        onPageStarted: (_) => setState(() => _cargando = true),
-        onPageFinished: (_) => setState(() => _cargando = false),
-        onNavigationRequest: (req) {
-          final url = req.url.toLowerCase();
-          if (url.contains(_urlExito) || url.contains('success')) {
-            _verificarOrden(exito: true);
-            return NavigationDecision.prevent;
-          }
-          if (url.contains(_urlCancel) || url.contains('cancel')) {
-            _verificarOrden(exito: false);
-            return NavigationDecision.prevent;
-          }
-          return NavigationDecision.navigate;
-        },
-      ))
+      ..setNavigationDelegate(
+        NavigationDelegate(
+          onPageStarted: (_) => setState(() => _cargando = true),
+          onPageFinished: (_) => setState(() => _cargando = false),
+          onNavigationRequest: (req) {
+            final url = req.url.toLowerCase();
+            if (url.contains(_urlExito) || url.contains('success')) {
+              _verificarOrden(exito: true);
+              return NavigationDecision.prevent;
+            }
+            if (url.contains(_urlCancel) || url.contains('cancel')) {
+              _verificarOrden(exito: false);
+              return NavigationDecision.prevent;
+            }
+            return NavigationDecision.navigate;
+          },
+        ),
+      )
       ..loadRequest(Uri.parse(widget.checkoutUrl));
   }
 
@@ -88,20 +91,7 @@ class _PagoStripeScreenState extends State<PagoStripeScreen> {
     setState(() => _verificando = true);
 
     try {
-      OrdenPagoResponse orden;
-      if (exito) {
-        // Al regresar con éxito de la pasarela, confirmamos la orden
-        try {
-          orden = await PagoService.confirmarPagoPrueba(
-            ordenId: widget.ordenId,
-            aprobar: true,
-          );
-        } catch (_) {
-          orden = await PagoService.obtenerOrden(widget.ordenId);
-        }
-      } else {
-        orden = await PagoService.obtenerOrden(widget.ordenId);
-      }
+      final orden = await PagoService.obtenerOrden(widget.ordenId);
       if (!mounted) return;
 
       _mostrarResultado(orden);
@@ -126,8 +116,9 @@ class _PagoStripeScreenState extends State<PagoStripeScreen> {
         actions: [
           ElevatedButton(
             style: ElevatedButton.styleFrom(
-              backgroundColor:
-                  orden.pagado ? AppColors.success : AppColors.danger,
+              backgroundColor: orden.pagado
+                  ? AppColors.success
+                  : AppColors.danger,
               foregroundColor: Colors.white,
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(10),
@@ -147,10 +138,7 @@ class _PagoStripeScreenState extends State<PagoStripeScreen> {
 
   void _mostrarError(String msg) {
     ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(msg),
-        backgroundColor: AppColors.danger,
-      ),
+      SnackBar(content: Text(msg), backgroundColor: AppColors.danger),
     );
     Navigator.of(context).pop();
   }
@@ -171,7 +159,8 @@ class _PagoStripeScreenState extends State<PagoStripeScreen> {
             builder: (ctx) => AlertDialog(
               title: const Text('¿Cancelar pago?'),
               content: const Text(
-                  'Si cierras esta pantalla, el pago no se completará.'),
+                'Cerrar esta pantalla no cancela un pago que ya está en proceso. Consulta su estado antes de iniciar otro.',
+              ),
               actions: [
                 TextButton(
                   onPressed: () => Navigator.of(ctx).pop(),
@@ -179,8 +168,9 @@ class _PagoStripeScreenState extends State<PagoStripeScreen> {
                 ),
                 ElevatedButton(
                   style: ElevatedButton.styleFrom(
-                      backgroundColor: AppColors.danger,
-                      foregroundColor: Colors.white),
+                    backgroundColor: AppColors.danger,
+                    foregroundColor: Colors.white,
+                  ),
                   onPressed: () {
                     Navigator.of(ctx).pop();
                     Navigator.of(context).pop();
@@ -204,9 +194,13 @@ class _PagoStripeScreenState extends State<PagoStripeScreen> {
           else
             TextButton.icon(
               onPressed: () => _verificarOrden(exito: true),
-              icon: const Icon(Icons.check_circle_outline, size: 16, color: AppColors.success),
+              icon: const Icon(
+                Icons.check_circle_outline,
+                size: 16,
+                color: AppColors.success,
+              ),
               label: const Text(
-                'Aprobar (Prueba)',
+                'Consultar estado',
                 style: TextStyle(
                   fontSize: 12,
                   color: AppColors.success,
@@ -216,7 +210,9 @@ class _PagoStripeScreenState extends State<PagoStripeScreen> {
             ),
         ],
       ),
-      body: kIsWeb ? _buildWebFallback() : _buildWebViewBody(),
+      body: !widget.checkoutUrl.startsWith('https://')
+          ? _ConsultaOrden(ordenId: widget.ordenId)
+          : (kIsWeb ? _buildWebFallback() : _buildWebViewBody()),
     );
   }
 
@@ -250,7 +246,11 @@ class _PagoStripeScreenState extends State<PagoStripeScreen> {
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                const Icon(Icons.open_in_new, size: 48, color: AppColors.accent),
+                const Icon(
+                  Icons.open_in_new,
+                  size: 48,
+                  color: AppColors.accent,
+                ),
                 const SizedBox(height: 12),
                 const Text(
                   'Abrir pago en Stripe',
@@ -275,9 +275,13 @@ class _PagoStripeScreenState extends State<PagoStripeScreen> {
                 ),
                 const SizedBox(height: 10),
                 OutlinedButton.icon(
-                  onPressed: _verificando ? null : () => _verificarOrden(exito: true),
+                  onPressed: _verificando
+                      ? null
+                      : () => _verificarOrden(exito: true),
                   icon: const Icon(Icons.check_circle_outline),
-                  label: Text(_verificando ? 'Verificando...' : 'Ya pagué, verificar'),
+                  label: Text(
+                    _verificando ? 'Verificando...' : 'Ya pagué, verificar',
+                  ),
                 ),
               ],
             ),
@@ -303,18 +307,14 @@ class _ResultadoPagoContent extends StatelessWidget {
       mainAxisSize: MainAxisSize.min,
       children: [
         const SizedBox(height: 8),
-        Icon(
-          visual.icon,
-          size: 64,
-          color: visual.color,
-        ),
+        Icon(visual.icon, size: 64, color: visual.color),
         const SizedBox(height: 16),
         Text(
           exito
               ? '¡Pago completado!'
               : pendiente
-                  ? 'Pago en proceso'
-                  : 'Pago no completado',
+              ? 'Pago en proceso'
+              : 'Pago no completado',
           style: const TextStyle(
             fontSize: 20,
             fontWeight: FontWeight.bold,
@@ -323,23 +323,23 @@ class _ResultadoPagoContent extends StatelessWidget {
           textAlign: TextAlign.center,
         ),
         const SizedBox(height: 12),
-        _InfoRow(
-            label: 'Estado',
-            valor: visual.label,
-            color: visual.color),
+        _InfoRow(label: 'Estado', valor: visual.label, color: visual.color),
         Padding(
           padding: const EdgeInsets.only(bottom: 6),
           child: Text(
             visual.description,
-            style: const TextStyle(fontSize: 12, color: AppColors.textSecondary),
+            style: const TextStyle(
+              fontSize: 12,
+              color: AppColors.textSecondary,
+            ),
             textAlign: TextAlign.center,
           ),
         ),
         _InfoRow(label: 'Orden #', valor: orden.ordenId.toString()),
         _InfoRow(
-            label: 'Total',
-            valor:
-                'Bs. ${orden.montoTotal.toStringAsFixed(2)} ${orden.moneda}'),
+          label: 'Total',
+          valor: 'Bs. ${orden.montoTotal.toStringAsFixed(2)} ${orden.moneda}',
+        ),
         _InfoRow(label: 'Método', valor: orden.metodo),
         if (orden.fechaPago != null)
           _InfoRow(label: 'Fecha', valor: orden.fechaPago!),
@@ -375,17 +375,139 @@ class _InfoRow extends StatelessWidget {
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Text(label,
-              style: const TextStyle(
-                  color: AppColors.textSecondary, fontSize: 13)),
-          Text(valor,
-              style: TextStyle(
-                fontSize: 13,
-                fontWeight: FontWeight.w600,
-                color: color ?? AppColors.textPrimary,
-              )),
+          Text(
+            label,
+            style: const TextStyle(
+              color: AppColors.textSecondary,
+              fontSize: 13,
+            ),
+          ),
+          Text(
+            valor,
+            style: TextStyle(
+              fontSize: 13,
+              fontWeight: FontWeight.w600,
+              color: color ?? AppColors.textPrimary,
+            ),
+          ),
         ],
       ),
+    );
+  }
+}
+
+class _ConsultaOrden extends StatefulWidget {
+  final int ordenId;
+  const _ConsultaOrden({required this.ordenId});
+  @override
+  State<_ConsultaOrden> createState() => _ConsultaOrdenState();
+}
+
+class _ConsultaOrdenState extends State<_ConsultaOrden> {
+  OrdenPagoResponse? orden;
+  bool ocupado = false;
+  String? error;
+  @override
+  void initState() {
+    super.initState();
+    cargar();
+  }
+
+  Future<void> cargar() async {
+    if (ocupado) return;
+    setState(() => ocupado = true);
+    try {
+      final actual = await PagoService.obtenerOrden(widget.ordenId);
+      if (mounted) {
+        setState(() {
+          orden = actual;
+          error = null;
+        });
+      }
+    } catch (_) {
+      if (mounted) {
+        setState(() {
+          orden = null;
+          error = 'No se pudo consultar la orden. Vuelve a intentarlo.';
+        });
+      }
+    } finally {
+      if (mounted) setState(() => ocupado = false);
+    }
+  }
+
+  Future<void> actuar(bool aprobar) async {
+    final o = orden;
+    if (o == null || ocupado || !o.confirmacionPrueba) return;
+    setState(() => ocupado = true);
+    try {
+      final actual = aprobar
+          ? (o.proveedor == 'QR_BCP'
+                ? await PagoService.confirmarPagoQr(o.ordenId)
+                : await PagoService.confirmarPagoPrueba(
+                    ordenId: o.ordenId,
+                    aprobar: true,
+                  ))
+          : (o.modoPago == 'LEGADO'
+                ? await PagoService.confirmarPagoPrueba(
+                    ordenId: o.ordenId,
+                    aprobar: false,
+                  )
+                : await PagoService.cancelar(o.ordenId));
+      if (mounted) {
+        setState(() {
+          orden = actual;
+          error = null;
+        });
+      }
+    } catch (_) {
+      if (mounted) {
+        setState(
+          () => error = 'No se pudo confirmar la acción. Consulta el estado antes de reintentar.',
+        );
+      }
+    } finally {
+      if (mounted) setState(() => ocupado = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final o = orden;
+    return ListView(
+      padding: const EdgeInsets.all(20),
+      children: [
+        const Text(
+          'Consulta de pago',
+          style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
+        ),
+        if (ocupado) const LinearProgressIndicator(),
+        if (error != null) Text(error!),
+        if (o != null) ...[
+          Text('Orden #${o.ordenId}'),
+          PaymentStatusBadge(estado: o.estado),
+          Text(paymentStatusVisual(o.estado).description),
+          if (o.modoPago == 'PRUEBA')
+            const Text(
+              'Entorno de pruebas. El QR simulado no recibe dinero real.',
+            ),
+          if (o.motivoIncidencia != null) Text(o.motivoIncidencia!),
+          if (o.pendiente && o.confirmacionPrueba) ...[
+            ElevatedButton(
+              onPressed: ocupado ? null : () => actuar(true),
+              child: const Text('Simular pago aprobado'),
+            ),
+            TextButton(
+              onPressed: ocupado ? null : () => actuar(false),
+              child: const Text('Cancelar intento'),
+            ),
+          ],
+        ],
+        TextButton(
+          onPressed: ocupado ? null : cargar,
+          child: const Text('Actualizar estado'),
+        ),
+      ],
     );
   }
 }

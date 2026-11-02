@@ -1,4 +1,6 @@
 class DeliveryCheckoutRequest {
+  final String? cotizacionId;
+  final int? direccionId;
   final int sucursalId;
   final String direccionEntrega;
   final String? referencia;
@@ -9,6 +11,8 @@ class DeliveryCheckoutRequest {
   final double? costoDelivery;
 
   const DeliveryCheckoutRequest({
+    this.cotizacionId,
+    this.direccionId,
     required this.sucursalId,
     required this.direccionEntrega,
     this.referencia,
@@ -20,18 +24,23 @@ class DeliveryCheckoutRequest {
   });
 
   Map<String, dynamic> toJson() => {
-        'sucursal_id': sucursalId,
-        'direccion_entrega': direccionEntrega,
-        if (referencia != null && referencia!.trim().isNotEmpty) 'referencia': referencia,
-        'latitud_entrega': latitudEntrega,
-        'longitud_entrega': longitudEntrega,
-        if (distanciaKm != null) 'distancia_km': distanciaKm,
-        if (tiempoEstimadoMin != null) 'tiempo_estimado_min': tiempoEstimadoMin,
-        if (costoDelivery != null) 'costo_delivery': costoDelivery,
-      };
+    if (cotizacionId != null) 'cotizacion_id': cotizacionId,
+    if (direccionId != null) 'direccion_id': direccionId,
+    'sucursal_id': sucursalId,
+    'direccion_entrega': direccionEntrega,
+    if (referencia != null && referencia!.trim().isNotEmpty)
+      'referencia': referencia,
+    'latitud_entrega': latitudEntrega,
+    'longitud_entrega': longitudEntrega,
+    if (distanciaKm != null) 'distancia_km': distanciaKm,
+    if (tiempoEstimadoMin != null) 'tiempo_estimado_min': tiempoEstimadoMin,
+    if (costoDelivery != null) 'costo_delivery': costoDelivery,
+  };
 }
 
 class DeliveryCotizacion {
+  final String? cotizacionId, venceEn;
+  final List<List<double>> ruta;
   final int sucursalId;
   final double distanciaKm;
   final int tiempoEstimadoMin;
@@ -40,6 +49,9 @@ class DeliveryCotizacion {
   final String? mensaje;
 
   const DeliveryCotizacion({
+    this.cotizacionId,
+    this.venceEn,
+    this.ruta = const [],
     required this.sucursalId,
     required this.distanciaKm,
     required this.tiempoEstimadoMin,
@@ -50,6 +62,9 @@ class DeliveryCotizacion {
 
   factory DeliveryCotizacion.fromJson(Map<String, dynamic> json) {
     return DeliveryCotizacion(
+      cotizacionId: json['cotizacion_id']?.toString(),
+      venceEn: json['vence_en']?.toString(),
+      ruta: _ruta(json['ruta']),
       sucursalId: _asInt(json['sucursal_id']),
       distanciaKm: _asDouble(json['distancia_km']),
       tiempoEstimadoMin: _asInt(json['tiempo_estimado_min']),
@@ -81,6 +96,8 @@ class DeliveryGeocodificacion {
 }
 
 class DeliveryItem {
+  final int version;
+  final bool pagoConfirmado, incidenciaAbierta;
   final int id;
   final int ventaId;
   final String? ventaCodigo;
@@ -99,6 +116,9 @@ class DeliveryItem {
   final String? fechaEntrega;
 
   const DeliveryItem({
+    this.version = 1,
+    this.pagoConfirmado = false,
+    this.incidenciaAbierta = false,
     required this.id,
     required this.ventaId,
     this.ventaCodigo,
@@ -119,6 +139,9 @@ class DeliveryItem {
 
   factory DeliveryItem.fromJson(Map<String, dynamic> json) {
     return DeliveryItem(
+      version: _asInt(json['version'] ?? 1),
+      pagoConfirmado: json['pago_confirmado'] == true,
+      incidenciaAbierta: json['incidencia_abierta'] == true,
       id: _asInt(json['id']),
       ventaId: _asInt(json['venta_id']),
       ventaCodigo: json['venta_codigo']?.toString(),
@@ -140,6 +163,10 @@ class DeliveryItem {
 }
 
 class DeliveryDetalle extends DeliveryItem {
+  final List<List<double>> ruta;
+  final List<Map<String, dynamic>> historial;
+  final List<String> transiciones;
+  final bool puedeGestionar;
   final String? sucursalDireccion;
   final double? sucursalLatitud;
   final double? sucursalLongitud;
@@ -148,6 +175,13 @@ class DeliveryDetalle extends DeliveryItem {
   final String? observacion;
 
   const DeliveryDetalle({
+    super.version,
+    super.pagoConfirmado,
+    super.incidenciaAbierta,
+    this.ruta = const [],
+    this.historial = const [],
+    this.transiciones = const [],
+    this.puedeGestionar = false,
     required super.id,
     required super.ventaId,
     super.ventaCodigo,
@@ -175,6 +209,14 @@ class DeliveryDetalle extends DeliveryItem {
   factory DeliveryDetalle.fromJson(Map<String, dynamic> json) {
     final item = DeliveryItem.fromJson(json);
     return DeliveryDetalle(
+      version: item.version,
+      pagoConfirmado: item.pagoConfirmado,
+      incidenciaAbierta: item.incidenciaAbierta,
+      ruta: _ruta(json['ruta']),
+      historial: (json['historial'] as List? ?? [])
+          .cast<Map<String, dynamic>>(),
+      transiciones: (json['transiciones'] as List? ?? []).cast<String>(),
+      puedeGestionar: json['puede_gestionar'] == true,
       id: item.id,
       ventaId: item.ventaId,
       ventaCodigo: item.ventaCodigo,
@@ -192,8 +234,12 @@ class DeliveryDetalle extends DeliveryItem {
       fechaCreacion: item.fechaCreacion,
       fechaEntrega: item.fechaEntrega,
       sucursalDireccion: json['sucursal_direccion']?.toString(),
-      sucursalLatitud: json['sucursal_latitud'] == null ? null : _asDouble(json['sucursal_latitud']),
-      sucursalLongitud: json['sucursal_longitud'] == null ? null : _asDouble(json['sucursal_longitud']),
+      sucursalLatitud: json['sucursal_latitud'] == null
+          ? null
+          : _asDouble(json['sucursal_latitud']),
+      sucursalLongitud: json['sucursal_longitud'] == null
+          ? null
+          : _asDouble(json['sucursal_longitud']),
       latitudEntrega: _asDouble(json['latitud_entrega']),
       longitudEntrega: _asDouble(json['longitud_entrega']),
       observacion: json['observacion']?.toString(),
@@ -203,4 +249,9 @@ class DeliveryDetalle extends DeliveryItem {
 
 int _asInt(dynamic value) => value is int ? value : int.parse(value.toString());
 
-double _asDouble(dynamic value) => double.tryParse(value?.toString() ?? '0') ?? 0.0;
+double _asDouble(dynamic value) =>
+    double.tryParse(value?.toString() ?? '0') ?? 0.0;
+
+List<List<double>> _ruta(dynamic data) => (data as List? ?? [])
+    .map((p) => (p as List).map((n) => (n as num).toDouble()).toList())
+    .toList();

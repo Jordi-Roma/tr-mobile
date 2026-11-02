@@ -1,3 +1,6 @@
+import '../../core/network/api_client.dart';
+import '../../core/constants/api_constants.dart';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:intl/intl.dart';
@@ -10,6 +13,8 @@ import '../../providers/auth_provider.dart';
 import '../../providers/carrito_provider.dart';
 import '../../providers/reserva_provider.dart';
 import '../../models/catalogo_models.dart';
+import '../../models/pago_models.dart';
+import '../../core/session/contexto_sesion.dart';
 import '../../models/delivery_models.dart';
 import '../../services/delivery_service.dart';
 import '../../services/pago_service.dart';
@@ -41,22 +46,101 @@ class _CarritoScreenState extends State<CarritoScreen> {
   bool _cotizandoDelivery = false;
   bool _buscandoUbicacion = false;
   DeliveryCotizacion? _cotizacionDelivery;
+  bool _cotizacionAceptada = false;
+  int _solicitudCotizacion = 0;
+  List<Map<String, dynamic>> _direccionesEntrega = [];
+  int? _direccionEntregaId;
+  void _invalidarCotizacion() {
+    _solicitudCotizacion++;
+    _cotizacionDelivery = null;
+    _cotizacionAceptada = false;
+    _cotizandoDelivery = false;
+  }
+
+  Future<void> _cargarDireccionesEntrega() async {
+    final gen = ContextoSesion.instance.generacion;
+    try {
+      final datos = await ApiClient.get(ApiConstants.perfilDirecciones);
+      if (mounted && gen == ContextoSesion.instance.generacion) {
+        setState(
+          () => _direccionesEntrega =
+              ((datos as Map<String, dynamic>)['direcciones'] as List)
+                  .cast<Map<String, dynamic>>(),
+        );
+      }
+    } catch (_) {
+      if (mounted && gen == ContextoSesion.instance.generacion) {
+        setState(() => _direccionesEntrega = []);
+      }
+    }
+  }
+
   String _metodoPago = 'QR';
+  OrdenPagoResponse? _pagoPendiente;
+  int _generacionPago = 0;
+  void _cambioSesionPago() {
+    final sesion = ContextoSesion.instance;
+    if (!mounted || sesion.generacion == _generacionPago) return;
+    _generacionPago = sesion.generacion;
+    setState(() {
+      _pagoPendiente = null;
+      _invalidarCotizacion();
+      _direccionesEntrega = [];
+      _direccionEntregaId = null;
+    });
+    if (sesion.usuario?.roles.contains('CLIENTE') ?? false) {
+      _recuperarPago();
+      _cargarDireccionesEntrega();
+    }
+  }
+
+  Future<void> _recuperarPago() async {
+    final gen = ContextoSesion.instance.generacion;
+    try {
+      final orden = await PagoService.pendiente();
+      if (mounted && gen == ContextoSesion.instance.generacion) {
+        setState(() => _pagoPendiente = orden);
+      }
+    } catch (_) {
+      /* El historial permite reintentar la consulta. */
+    }
+  }
+
+  Future<void> _abrirPendiente() async {
+    final orden = _pagoPendiente;
+    if (orden == null) return;
+    await Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => PagoStripeScreen(
+          checkoutUrl: orden.checkoutUrl ?? '',
+          ordenId: orden.ordenId,
+        ),
+      ),
+    );
+    if (!mounted) return;
+    await _recuperarPago();
+    if (mounted) context.read<CarritoProvider>().cargarCarrito();
+  }
 
   @override
   void initState() {
     super.initState();
+    _generacionPago = ContextoSesion.instance.generacion;
+    ContextoSesion.instance.addListener(_cambioSesionPago);
     _fechaCitaReserva = _soloFecha(DateTime.now());
     WidgetsBinding.instance.addPostFrameCallback((_) {
       final auth = context.read<AuthProvider>();
       if (auth.estaAutenticado) {
         context.read<CarritoProvider>().cargarCarrito();
+        _recuperarPago();
+        _cargarDireccionesEntrega();
       }
     });
   }
 
   @override
   void dispose() {
+    ContextoSesion.instance.removeListener(_cambioSesionPago);
     _observacionCtrl.dispose();
     _direccionDeliveryCtrl.dispose();
     _referenciaDeliveryCtrl.dispose();
@@ -89,10 +173,15 @@ class _CarritoScreenState extends State<CarritoScreen> {
       return null;
     }
     if (exigirCotizacion &&
-        (_cotizacionDelivery == null || !_cotizacionDelivery!.disponible)) {
+        (_cotizacionDelivery == null ||
+            !_cotizacionDelivery!.disponible ||
+            _cotizacionDelivery!.cotizacionId == null ||
+            !_cotizacionAceptada)) {
       return null;
     }
     return DeliveryCheckoutRequest(
+      direccionId: _direccionEntregaId,
+      cotizacionId: exigirCotizacion ? _cotizacionDelivery?.cotizacionId : null,
       sucursalId: sucursalId,
       direccionEntrega: direccion,
       referencia: _referenciaDeliveryCtrl.text.trim(),
@@ -106,7 +195,7 @@ class _CarritoScreenState extends State<CarritoScreen> {
 
   bool _excedeMaximoReserva() {
     return context.read<CarritoProvider>().items.any(
-      (item) => item.cantidad > 2,
+      (item) => item.paqueteId != null || item.cantidad > 2,
     );
   }
 
@@ -150,10 +239,14 @@ class _CarritoScreenState extends State<CarritoScreen> {
       );
       return;
     }
-    setState(() => _cotizandoDelivery = true);
+    setState(() {
+      _invalidarCotizacion();
+      _cotizandoDelivery = true;
+    });
+    final solicitud = _solicitudCotizacion;
     try {
       final cotizacion = await DeliveryService.cotizar(request);
-      if (!mounted) return;
+      if (!mounted || solicitud != _solicitudCotizacion) return;
       setState(() => _cotizacionDelivery = cotizacion);
       if (!cotizacion.disponible) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -165,7 +258,7 @@ class _CarritoScreenState extends State<CarritoScreen> {
         );
       }
     } catch (e) {
-      if (!mounted) return;
+      if (!mounted || solicitud != _solicitudCotizacion) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(e.toString()),
@@ -173,7 +266,9 @@ class _CarritoScreenState extends State<CarritoScreen> {
         ),
       );
     } finally {
-      if (mounted) setState(() => _cotizandoDelivery = false);
+      if (mounted && solicitud == _solicitudCotizacion) {
+        setState(() => _cotizandoDelivery = false);
+      }
     }
   }
 
@@ -193,13 +288,13 @@ class _CarritoScreenState extends State<CarritoScreen> {
     setState(() => _buscandoUbicacion = true);
     try {
       final resultado = await DeliveryService.geocodificar(direccion);
-      if (!mounted) return;
+      if (!mounted || _direccionDeliveryCtrl.text.trim() != direccion) return;
       setState(() {
         _ubicacionDelivery = LatLng(resultado.latitud, resultado.longitud);
         if (resultado.direccion.isNotEmpty) {
           _direccionDeliveryCtrl.text = resultado.direccion;
         }
-        _cotizacionDelivery = null;
+        _invalidarCotizacion();
       });
     } catch (e) {
       if (!mounted) return;
@@ -386,6 +481,9 @@ class _CarritoScreenState extends State<CarritoScreen> {
         sucursalId: sucursalId,
         tipoEntrega: _usaDelivery ? 'DELIVERY' : 'RECOJO_SUCURSAL',
         delivery: delivery,
+        totalEsperado:
+            context.read<CarritoProvider>().totalMonto +
+            (_usaDelivery ? (_cotizacionDelivery?.costoDelivery ?? 0) : 0),
       );
 
       if (!mounted) return;
@@ -416,7 +514,12 @@ class _CarritoScreenState extends State<CarritoScreen> {
         ),
       );
     } finally {
-      if (mounted) setState(() => _procesandoPago = false);
+      if (mounted) {
+        setState(() {
+          _procesandoPago = false;
+          _invalidarCotizacion();
+        });
+      }
     }
   }
 
@@ -448,6 +551,9 @@ class _CarritoScreenState extends State<CarritoScreen> {
         sucursalId: sucursalId,
         tipoEntrega: _usaDelivery ? 'DELIVERY' : 'RECOJO_SUCURSAL',
         delivery: delivery,
+        totalEsperado:
+            context.read<CarritoProvider>().totalMonto +
+            (_usaDelivery ? (_cotizacionDelivery?.costoDelivery ?? 0) : 0),
       );
 
       if (!mounted) return;
@@ -485,7 +591,12 @@ class _CarritoScreenState extends State<CarritoScreen> {
         ),
       );
     } finally {
-      if (mounted) setState(() => _procesandoPago = false);
+      if (mounted) {
+        setState(() {
+          _procesandoPago = false;
+          _invalidarCotizacion();
+        });
+      }
     }
   }
 
@@ -539,7 +650,7 @@ class _CarritoScreenState extends State<CarritoScreen> {
           onTap: (_, point) {
             setState(() {
               _ubicacionDelivery = point;
-              _cotizacionDelivery = null;
+              _invalidarCotizacion();
               if (_direccionDeliveryCtrl.text.trim().isEmpty) {
                 _direccionDeliveryCtrl.text =
                     'Ubicación seleccionada en el mapa';
@@ -552,11 +663,13 @@ class _CarritoScreenState extends State<CarritoScreen> {
             urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
             userAgentPackageName: 'com.stylear.mobile',
           ),
-          if (sucursalPoint != null)
+          if (_cotizacionDelivery?.ruta.isNotEmpty ?? false)
             PolylineLayer(
               polylines: [
                 Polyline(
-                  points: [sucursalPoint, _ubicacionDelivery],
+                  points: _cotizacionDelivery!.ruta
+                      .map((p) => LatLng(p[1], p[0]))
+                      .toList(),
                   color: AppColors.primary,
                   strokeWidth: 4,
                 ),
@@ -618,7 +731,10 @@ class _CarritoScreenState extends State<CarritoScreen> {
         : 0.0;
     final totalConDelivery = carrito.totalMonto + costoDelivery;
     final excedeMaximoReserva =
-        !_usaDelivery && carrito.items.any((item) => item.cantidad > 2);
+        !_usaDelivery &&
+        carrito.items.any(
+          (item) => item.paqueteId != null || item.cantidad > 2,
+        );
     final puedeConfirmar = sucursalActual != null && !excedeMaximoReserva;
 
     return Scaffold(
@@ -668,6 +784,18 @@ class _CarritoScreenState extends State<CarritoScreen> {
       body: SafeArea(
         child: Column(
           children: [
+            if (_pagoPendiente != null)
+              ListTile(
+                leading: const Icon(Icons.pending_actions),
+                title: Text('Pago pendiente #${_pagoPendiente!.ordenId}'),
+                subtitle: const Text(
+                  'Consulta o cancela el intento antes de iniciar otro.',
+                ),
+                trailing: TextButton(
+                  onPressed: _abrirPendiente,
+                  child: const Text('Consultar'),
+                ),
+              ),
             // Lista de items del carrito
             Expanded(
               child: ListView.separated(
@@ -704,7 +832,7 @@ class _CarritoScreenState extends State<CarritoScreen> {
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
                                 Text(
-                                  item.producto,
+                                  '${item.producto} · ${item.paqueteId == null ? 'Unidad' : '${item.tipoCompra} #${item.paqueteId}'}',
                                   style: const TextStyle(
                                     fontWeight: FontWeight.w700,
                                     fontSize: 15,
@@ -725,7 +853,8 @@ class _CarritoScreenState extends State<CarritoScreen> {
                                       ? currencyFormat.format(
                                           item.precioUnitario,
                                         )
-                                      : 'No disponible: retira esta prenda',
+                                      : item.motivoNoDisponible ??
+                                            'No disponible: retira esta prenda',
                                   style: const TextStyle(
                                     fontWeight: FontWeight.w600,
                                     fontSize: 14,
@@ -748,6 +877,9 @@ class _CarritoScreenState extends State<CarritoScreen> {
                                 ),
                                 padding: EdgeInsets.zero,
                                 constraints: const BoxConstraints(),
+                                tooltip: item.paqueteId == null
+                                    ? 'Quitar producto'
+                                    : 'Quitar paquete completo',
                                 onPressed: () => carrito.eliminarItem(item.id),
                               ),
                               const SizedBox(height: 8),
@@ -761,10 +893,12 @@ class _CarritoScreenState extends State<CarritoScreen> {
                                   mainAxisSize: MainAxisSize.min,
                                   children: [
                                     InkWell(
-                                      onTap: () => carrito.actualizarCantidad(
-                                        item.id,
-                                        item.cantidad - 1,
-                                      ),
+                                      onTap: item.paqueteId != null
+                                          ? null
+                                          : () => carrito.actualizarCantidad(
+                                              item.id,
+                                              item.cantidad - 1,
+                                            ),
                                       child: const Padding(
                                         padding: EdgeInsets.symmetric(
                                           horizontal: 6,
@@ -786,10 +920,12 @@ class _CarritoScreenState extends State<CarritoScreen> {
                                       ),
                                     ),
                                     InkWell(
-                                      onTap: () => carrito.actualizarCantidad(
-                                        item.id,
-                                        item.cantidad + 1,
-                                      ),
+                                      onTap: item.paqueteId != null
+                                          ? null
+                                          : () => carrito.actualizarCantidad(
+                                              item.id,
+                                              item.cantidad + 1,
+                                            ),
                                       child: const Padding(
                                         padding: EdgeInsets.symmetric(
                                           horizontal: 6,
@@ -875,7 +1011,7 @@ class _CarritoScreenState extends State<CarritoScreen> {
                               onChanged: (val) {
                                 setState(() {
                                   _sucursalSeleccionadaId = val;
-                                  _cotizacionDelivery = null;
+                                  _invalidarCotizacion();
                                 });
                               },
                             ),
@@ -921,11 +1057,47 @@ class _CarritoScreenState extends State<CarritoScreen> {
                         onSelectionChanged: (value) {
                           setState(() {
                             _usaDelivery = value.first;
-                            _cotizacionDelivery = null;
+                            _invalidarCotizacion();
                           });
                         },
                       ),
                       if (_usaDelivery) ...[
+                        const Text(
+                          'Compra y envío se pagan con Stripe o QR. No hay efectivo al entregar.',
+                        ),
+                        DropdownButtonFormField<int>(
+                          initialValue: _direccionEntregaId,
+                          decoration: const InputDecoration(
+                            labelText: 'Dirección guardada (opcional)',
+                          ),
+                          items: _direccionesEntrega
+                              .map(
+                                (d) => DropdownMenuItem(
+                                  value: d['id'] as int,
+                                  child: Text(
+                                    d['direccion'].toString(),
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                ),
+                              )
+                              .toList(),
+                          onChanged: (id) {
+                            final d = _direccionesEntrega
+                                .where((x) => x['id'] == id)
+                                .firstOrNull;
+                            if (d != null) {
+                              setState(() {
+                                _direccionEntregaId = id;
+                                _direccionDeliveryCtrl.text = d['direccion']
+                                    .toString();
+                                _referenciaDeliveryCtrl.text =
+                                    d['referencia']?.toString() ?? '';
+                                _invalidarCotizacion();
+                              });
+                              _buscarUbicacionDelivery();
+                            }
+                          },
+                        ),
                         const SizedBox(height: 12),
                         TextField(
                           controller: _direccionDeliveryCtrl,
@@ -933,12 +1105,12 @@ class _CarritoScreenState extends State<CarritoScreen> {
                             labelText: 'Dirección de entrega',
                             hintText: 'Ej. Av. Banzer 4to anillo, Santa Cruz',
                           ),
-                          onChanged: (_) =>
-                              setState(() => _cotizacionDelivery = null),
+                          onChanged: (_) => setState(_invalidarCotizacion),
                         ),
                         const SizedBox(height: 8),
                         TextField(
                           controller: _referenciaDeliveryCtrl,
+                          onChanged: (_) => setState(_invalidarCotizacion),
                           decoration: const InputDecoration(
                             labelText: 'Referencia',
                             hintText: 'Ej. Casa roja frente a farmacia',
@@ -978,6 +1150,20 @@ class _CarritoScreenState extends State<CarritoScreen> {
                                 : 'Cotizar delivery',
                           ),
                         ),
+                        if (_cotizacionDelivery?.cotizacionId != null) ...[
+                          CheckboxListTile(
+                            value: _cotizacionAceptada,
+                            onChanged: (v) => setState(
+                              () => _cotizacionAceptada = v ?? false,
+                            ),
+                            title: const Text(
+                              'Acepto la cotización del envío mostrada',
+                            ),
+                          ),
+                          Text(
+                            'Válida hasta ${_cotizacionDelivery!.venceEn}. Cambiar el destino requiere cotizar de nuevo.',
+                          ),
+                        ],
                         if (_cotizacionDelivery != null) ...[
                           const SizedBox(height: 8),
                           Text(
@@ -1193,13 +1379,15 @@ class _CarritoScreenState extends State<CarritoScreen> {
                             size: 22,
                           ),
                           label: Text(
-                            'Pagar con QR Simple (${currencyFormat.format(_usaDelivery ? totalConDelivery : carrito.totalMonto)})',
+                            'Probar pago QR (${currencyFormat.format(_usaDelivery ? totalConDelivery : carrito.totalMonto)})',
                             style: const TextStyle(
                               fontWeight: FontWeight.w700,
                               fontSize: 15,
                             ),
                           ),
-                          onPressed: puedeConfirmar ? _pagarConQr : null,
+                          onPressed: sucursalActual != null
+                              ? _pagarConQr
+                              : null,
                         )
                       else
                         OutlinedButton.icon(
@@ -1225,7 +1413,9 @@ class _CarritoScreenState extends State<CarritoScreen> {
                               fontSize: 15,
                             ),
                           ),
-                          onPressed: puedeConfirmar ? _pagarConStripe : null,
+                          onPressed: sucursalActual != null
+                              ? _pagarConStripe
+                              : null,
                         ),
                     ],
                   ),

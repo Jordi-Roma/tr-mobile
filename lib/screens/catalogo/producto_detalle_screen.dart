@@ -1,3 +1,4 @@
+import '../mayorista/mayorista_screen.dart';
 import 'dart:convert';
 
 import 'package:flutter/material.dart';
@@ -1001,6 +1002,12 @@ class _ProductoDetalleScreenState extends State<ProductoDetalleScreen> {
                           ),
                           const SizedBox(height: 24),
 
+                          OutlinedButton.icon(
+                            icon: const Icon(Icons.inventory_2_outlined),
+                            label: const Text('Comprar por mayor · paquetes'),
+                            onPressed: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => MayoristaScreen(detalle: detalle))),
+                          ),
+                          const Text('La compra unitaria mantiene cantidades libres por talla y color.'),
                           // Descripción y Detalles
                           if (detalle.descripcion != null &&
                               detalle.descripcion!.isNotEmpty) ...[

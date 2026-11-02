@@ -5,8 +5,13 @@ import '../models/delivery_models.dart';
 class DeliveryService {
   DeliveryService._();
 
-  static Future<DeliveryCotizacion> cotizar(DeliveryCheckoutRequest request) async {
-    final res = await ApiClient.post(ApiConstants.deliveryCotizar, body: request.toJson());
+  static Future<DeliveryCotizacion> cotizar(
+    DeliveryCheckoutRequest request,
+  ) async {
+    final res = await ApiClient.post(
+      ApiConstants.deliveryCotizar,
+      body: request.toJson(),
+    );
     return DeliveryCotizacion.fromJson(res as Map<String, dynamic>);
   }
 
@@ -44,16 +49,40 @@ class DeliveryService {
     return DeliveryDetalle.fromJson(res as Map<String, dynamic>);
   }
 
+  static Future<DeliveryDetalle> incidencia(
+    int id,
+    int version,
+    String observacion,
+    bool resolver,
+  ) async {
+    final res = await ApiClient.post(
+      '${ApiConstants.baseUrl}/delivery/$id/incidencias',
+      body: {
+        'version': version,
+        'observacion': observacion,
+        'resolver': resolver,
+      },
+    );
+    return DeliveryDetalle.fromJson(
+      (res as Map<String, dynamic>)['delivery'] as Map<String, dynamic>,
+    );
+  }
+
   static Future<DeliveryDetalle> actualizarEstado({
     required int deliveryId,
     required String estado,
+    required int version,
+    bool recepcionConfirmada = false,
     String? observacion,
   }) async {
     final res = await ApiClient.patch(
       ApiConstants.deliveryEstado(deliveryId),
       body: {
+        'version': version,
+        'recepcion_confirmada': recepcionConfirmada,
         'estado': estado,
-        if (observacion != null && observacion.trim().isNotEmpty) 'observacion': observacion.trim(),
+        if (observacion != null && observacion.trim().isNotEmpty)
+          'observacion': observacion.trim(),
       },
     );
     final data = res as Map<String, dynamic>;

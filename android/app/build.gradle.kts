@@ -4,6 +4,11 @@ plugins {
     id("dev.flutter.flutter-gradle-plugin")
 }
 
+// La configuración Firebase es local; los checkouts sin ella siguen compilando.
+if (file("google-services.json").isFile) {
+    apply(plugin = "com.google.gms.google-services")
+}
+
 android {
     namespace = "com.example.mobile_tr"
     compileSdk = flutter.compileSdkVersion

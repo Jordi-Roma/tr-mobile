@@ -1,6 +1,10 @@
 import 'catalogo_models.dart';
 
 class CarritoItemResponse {
+  final int? paqueteId;
+  final String tipoCompra;
+  final double? descuentoMayorista;
+  final String? motivoNoDisponible;
   final int id;
   final int productoVarianteId;
   final int productoId;
@@ -18,6 +22,10 @@ class CarritoItemResponse {
   final bool disponibleParaCompra;
 
   CarritoItemResponse({
+    this.paqueteId,
+    this.tipoCompra = 'UNIDAD',
+    this.descuentoMayorista,
+    this.motivoNoDisponible,
     required this.id,
     required this.productoVarianteId,
     required this.productoId,
@@ -37,6 +45,10 @@ class CarritoItemResponse {
 
   factory CarritoItemResponse.fromJson(Map<String, dynamic> json) {
     return CarritoItemResponse(
+      paqueteId: (json['paquete_id'] as num?)?.toInt(),
+      tipoCompra: json['tipo_compra']?.toString() ?? 'UNIDAD',
+      descuentoMayorista: double.tryParse('${json['descuento_mayorista']}'),
+      motivoNoDisponible: json['motivo_no_disponible']?.toString(),
       id: json['id'] is int ? json['id'] : int.parse(json['id'].toString()),
       productoVarianteId: json['producto_variante_id'] is int
           ? json['producto_variante_id']

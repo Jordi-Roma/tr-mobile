@@ -1,4 +1,5 @@
-import 'dart:async';
+import 'pago_stripe_screen.dart';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
@@ -12,10 +13,7 @@ import '../../services/pago_service.dart';
 class PagoQrScreen extends StatefulWidget {
   final CheckoutQrResponse checkout;
 
-  const PagoQrScreen({
-    super.key,
-    required this.checkout,
-  });
+  const PagoQrScreen({super.key, required this.checkout});
 
   @override
   State<PagoQrScreen> createState() => _PagoQrScreenState();
@@ -23,41 +21,6 @@ class PagoQrScreen extends StatefulWidget {
 
 class _PagoQrScreenState extends State<PagoQrScreen> {
   bool _confirmando = false;
-  int _segundosRestantes = 15 * 60; // 15 minutos
-  Timer? _timer;
-
-  @override
-  void initState() {
-    super.initState();
-    _iniciarTemporizador();
-  }
-
-  void _iniciarTemporizador() {
-    _timer = Timer.periodic(const Duration(seconds: 1), (timer) {
-      if (!mounted) {
-        timer.cancel();
-        return;
-      }
-      if (_segundosRestantes > 0) {
-        setState(() => _segundosRestantes--);
-      } else {
-        timer.cancel();
-      }
-    });
-  }
-
-  @override
-  void dispose() {
-    _timer?.cancel();
-    super.dispose();
-  }
-
-  String get _tiempoFormateado {
-    final minutos = (_segundosRestantes ~/ 60).toString().padLeft(2, '0');
-    final segundos = (_segundosRestantes % 60).toString().padLeft(2, '0');
-    return '$minutos:$segundos';
-  }
-
   void _copiarAlPortapapeles(String texto, String mensaje) {
     Clipboard.setData(ClipboardData(text: texto));
     ScaffoldMessenger.of(context).showSnackBar(
@@ -76,6 +39,7 @@ class _PagoQrScreenState extends State<PagoQrScreen> {
   }
 
   Future<void> _confirmarPago() async {
+    if (_confirmando || !widget.checkout.confirmacionPrueba) return;
     setState(() => _confirmando = true);
 
     try {
@@ -87,7 +51,9 @@ class _PagoQrScreenState extends State<PagoQrScreen> {
         context: context,
         barrierDismissible: false,
         builder: (ctx) => AlertDialog(
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(20),
+          ),
           content: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
@@ -105,8 +71,10 @@ class _PagoQrScreenState extends State<PagoQrScreen> {
                 ),
               ),
               const SizedBox(height: 18),
-              const Text(
-                '¡Pago Confirmado!',
+              Text(
+                orden.pagado
+                    ? 'Compra de prueba completada'
+                    : 'Revisa el estado del pago',
                 style: TextStyle(
                   fontSize: 20,
                   fontWeight: FontWeight.w800,
@@ -115,7 +83,10 @@ class _PagoQrScreenState extends State<PagoQrScreen> {
               ),
               const SizedBox(height: 8),
               Text(
-                'Tu compra por ${NumberFormat.currency(locale: 'es_BO', symbol: 'Bs. ').format(widget.checkout.montoTotal)} ha sido procesada exitosamente.',
+                orden.pagado
+                    ? 'La simulación de compra se completó.'
+                    : (orden.motivoIncidencia ??
+                          'Estado: ${orden.estado}. No se confirmó una venta completada.'),
                 textAlign: TextAlign.center,
                 style: const TextStyle(
                   color: AppColors.textSecondary,
@@ -128,13 +99,18 @@ class _PagoQrScreenState extends State<PagoQrScreen> {
                   backgroundColor: AppColors.primary,
                   foregroundColor: Colors.white,
                   minimumSize: const Size(double.infinity, 46),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
                 ),
                 onPressed: () {
                   Navigator.of(ctx).pop();
                   Navigator.of(context).pop(orden);
                 },
-                child: const Text('Continuar', style: TextStyle(fontWeight: FontWeight.w700)),
+                child: const Text(
+                  'Continuar',
+                  style: TextStyle(fontWeight: FontWeight.w700),
+                ),
               ),
             ],
           ),
@@ -143,10 +119,7 @@ class _PagoQrScreenState extends State<PagoQrScreen> {
     } on ApiException catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(e.message),
-          backgroundColor: AppColors.danger,
-        ),
+        SnackBar(content: Text(e.message), backgroundColor: AppColors.danger),
       );
     } catch (e) {
       if (!mounted) return;
@@ -166,11 +139,10 @@ class _PagoQrScreenState extends State<PagoQrScreen> {
   @override
   Widget build(BuildContext context) {
     final currency = NumberFormat.currency(locale: 'es_BO', symbol: 'Bs. ');
-    final expirado = _segundosRestantes <= 0;
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Pago QR Simple'),
+        title: const Text('QR de prueba · No transferir dinero'),
         leading: IconButton(
           icon: const Icon(Icons.close),
           onPressed: () => Navigator.of(context).pop(),
@@ -203,7 +175,7 @@ class _PagoQrScreenState extends State<PagoQrScreen> {
               child: Column(
                 children: [
                   const Text(
-                    'TOTAL A PAGAR',
+                    'TOTAL DE PRUEBA',
                     style: TextStyle(
                       color: Color(0xFF94A3B8),
                       fontSize: 12,
@@ -222,9 +194,12 @@ class _PagoQrScreenState extends State<PagoQrScreen> {
                   ),
                   const SizedBox(height: 8),
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 10,
+                      vertical: 4,
+                    ),
                     decoration: BoxDecoration(
-                      color: expirado ? AppColors.danger.withValues(alpha: 0.2) : Colors.white.withValues(alpha: 0.1),
+                      color: Colors.white.withValues(alpha: 0.1),
                       borderRadius: BorderRadius.circular(20),
                     ),
                     child: Row(
@@ -233,15 +208,15 @@ class _PagoQrScreenState extends State<PagoQrScreen> {
                         Icon(
                           Icons.timer_outlined,
                           size: 14,
-                          color: expirado ? AppColors.danger : Colors.white70,
+                          color: Colors.white70,
                         ),
                         const SizedBox(width: 4),
                         Text(
-                          expirado ? 'QR Expirado' : 'Expira en $_tiempoFormateado',
+                          'Simulación sin validez bancaria',
                           style: TextStyle(
                             fontSize: 12,
                             fontWeight: FontWeight.w600,
-                            color: expirado ? AppColors.danger : Colors.white,
+                            color: Colors.white,
                           ),
                         ),
                       ],
@@ -278,7 +253,11 @@ class _PagoQrScreenState extends State<PagoQrScreen> {
                           color: const Color(0xFF003882).withValues(alpha: 0.1),
                           shape: BoxShape.circle,
                         ),
-                        child: const Icon(Icons.qr_code_scanner, color: Color(0xFF003882), size: 20),
+                        child: const Icon(
+                          Icons.qr_code_scanner,
+                          color: Color(0xFF003882),
+                          size: 20,
+                        ),
                       ),
                       const SizedBox(width: 8),
                       Text(
@@ -295,13 +274,16 @@ class _PagoQrScreenState extends State<PagoQrScreen> {
 
                   // El QR
                   Opacity(
-                    opacity: expirado ? 0.3 : 1.0,
+                    opacity: 1.0,
                     child: Container(
                       padding: const EdgeInsets.all(12),
                       decoration: BoxDecoration(
                         color: Colors.white,
                         borderRadius: BorderRadius.circular(16),
-                        border: Border.all(color: const Color(0xFFCBD5E1), width: 1.5),
+                        border: Border.all(
+                          color: const Color(0xFFCBD5E1),
+                          width: 1.5,
+                        ),
                       ),
                       child: QrImageView(
                         data: widget.checkout.qrPayload,
@@ -322,7 +304,7 @@ class _PagoQrScreenState extends State<PagoQrScreen> {
                   const SizedBox(height: 14),
 
                   const Text(
-                    'Escanea este código desde la app de cualquier banco participante en Bolivia (BCP, BNB, Banco Unión, Mercantil, etc.)',
+                    'Este código identifica una simulación de StyleAR. No lo uses en una aplicación bancaria ni transfieras dinero.',
                     textAlign: TextAlign.center,
                     style: TextStyle(
                       fontSize: 12,
@@ -364,13 +346,19 @@ class _PagoQrScreenState extends State<PagoQrScreen> {
                   _buildDataRow(
                     label: 'Cuenta BCP',
                     valor: widget.checkout.cuenta,
-                    onCopy: () => _copiarAlPortapapeles(widget.checkout.cuenta, 'Cuenta copiada'),
+                    onCopy: () => _copiarAlPortapapeles(
+                      widget.checkout.cuenta,
+                      'Cuenta copiada',
+                    ),
                   ),
                   const Divider(height: 16, color: Color(0xFFF1F5F9)),
                   _buildDataRow(
                     label: 'Glosa / Concepto',
                     valor: widget.checkout.glosa,
-                    onCopy: () => _copiarAlPortapapeles(widget.checkout.glosa, 'Glosa copiada'),
+                    onCopy: () => _copiarAlPortapapeles(
+                      widget.checkout.glosa,
+                      'Glosa copiada',
+                    ),
                   ),
                 ],
               ),
@@ -378,6 +366,23 @@ class _PagoQrScreenState extends State<PagoQrScreen> {
             const SizedBox(height: 24),
 
             // Botón Principal: Confirmar Pago
+            const Padding(
+              padding: EdgeInsets.all(12),
+              child: Text(
+                'QR DE PRUEBA. No transfieras dinero: la conexión bancaria BCP está pendiente.',
+              ),
+            ),
+            TextButton(
+              onPressed: () => Navigator.of(context).push(
+                MaterialPageRoute(
+                  builder: (_) => PagoStripeScreen(
+                    checkoutUrl: '',
+                    ordenId: widget.checkout.ordenId,
+                  ),
+                ),
+              ),
+              child: const Text('Consultar estado o cancelar intento'),
+            ),
             _confirmando
                 ? const Center(
                     child: Padding(
@@ -389,24 +394,31 @@ class _PagoQrScreenState extends State<PagoQrScreen> {
                     children: [
                       ElevatedButton.icon(
                         style: ElevatedButton.styleFrom(
-                          backgroundColor: expirado ? Colors.grey : const Color(0xFF16A34A),
+                          backgroundColor: const Color(0xFF166534),
                           foregroundColor: Colors.white,
                           minimumSize: const Size.fromHeight(52),
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(14),
+                          ),
                           elevation: 2,
                         ),
                         icon: const Icon(Icons.check_circle_outline, size: 22),
                         label: const Text(
-                          'Ya realicé el pago',
-                          style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
+                          'Simular pago aprobado',
+                          style: TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w700,
+                          ),
                         ),
-                        onPressed: expirado ? null : _confirmarPago,
+                        onPressed: !widget.checkout.confirmacionPrueba
+                            ? null
+                            : _confirmarPago,
                       ),
                       const SizedBox(height: 10),
                       TextButton(
                         onPressed: () => Navigator.of(context).pop(),
                         child: const Text(
-                          'Cancelar o cambiar método',
+                          'Volver al carrito (el intento sigue pendiente)',
                           style: TextStyle(color: AppColors.textSecondary),
                         ),
                       ),
@@ -456,7 +468,11 @@ class _PagoQrScreenState extends State<PagoQrScreen> {
               if (onCopy != null) ...[
                 const SizedBox(width: 4),
                 IconButton(
-                  icon: const Icon(Icons.copy, size: 16, color: AppColors.primary),
+                  icon: const Icon(
+                    Icons.copy,
+                    size: 16,
+                    color: AppColors.primary,
+                  ),
                   onPressed: onCopy,
                   padding: EdgeInsets.zero,
                   constraints: const BoxConstraints(),

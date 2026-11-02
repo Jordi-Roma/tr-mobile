@@ -1,3 +1,5 @@
+import '../pagos/cambios_screen.dart';
+import '../notificaciones/notificaciones_screen.dart';
 import 'editar_perfil_screen.dart';
 import 'direcciones_screen.dart';
 import 'desactivar_cuenta_screen.dart';
@@ -421,6 +423,15 @@ class _PerfilScreenState extends State<PerfilScreen> {
                 child: Column(
                   children: [
                     ListTile(
+                      leading: const Icon(Icons.notifications_outlined),
+                      title: const Text('Mis notificaciones'),
+                      onTap: () => Navigator.of(context).push(
+                        MaterialPageRoute(
+                          builder: (_) => const NotificacionesScreen(),
+                        ),
+                      ),
+                    ),
+                    ListTile(
                       leading: const Icon(
                         Icons.person_outline,
                         color: AppColors.primary,
@@ -467,6 +478,16 @@ class _PerfilScreenState extends State<PerfilScreen> {
                     if (roles.contains('CLIENTE') ||
                         auth.esAdminOEncargado ||
                         roles.contains('CAJERO')) ...[
+                      ListTile(
+                        leading: const Icon(Icons.swap_horiz),
+                        title: const Text('Cambios de prendas'),
+                        trailing: const Icon(Icons.chevron_right),
+                        onTap: () => Navigator.of(context).push(
+                          MaterialPageRoute(
+                            builder: (_) => const CambiosScreen(),
+                          ),
+                        ),
+                      ),
                       const Divider(),
                       ListTile(
                         leading: const Icon(

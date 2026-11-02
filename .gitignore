@@ -46,3 +46,8 @@ app.*.map.json
 
 # Widget Preview related
 .widget_preview/
+
+# Configuración local de conexiones; la cuenta de servicio pertenece solo al backend.
+/firebase.defines.local.json
+/android/app/google-services.json
+/ios/Runner/GoogleService-Info.plist

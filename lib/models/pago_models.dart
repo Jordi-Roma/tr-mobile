@@ -12,19 +12,23 @@ class CrearCheckoutStripeRequest {
   });
 
   Map<String, dynamic> toJson() => {
-        if (sucursalId != null) 'sucursal_id': sucursalId,
-        'tipo_entrega': tipoEntrega,
-        if (delivery != null) 'delivery': delivery!.toJson(),
-      };
+    if (sucursalId != null) 'sucursal_id': sucursalId,
+    'tipo_entrega': tipoEntrega,
+    if (delivery != null) 'delivery': delivery!.toJson(),
+  };
 }
 
 class CheckoutStripeResponse {
+  final String modoPago;
+  final bool confirmacionPrueba;
   final int ordenId;
   final int ventaId;
   final String estado;
   final String checkoutUrl;
 
   const CheckoutStripeResponse({
+    this.modoPago = 'LEGADO',
+    this.confirmacionPrueba = false,
     required this.ordenId,
     required this.ventaId,
     required this.estado,
@@ -33,6 +37,8 @@ class CheckoutStripeResponse {
 
   factory CheckoutStripeResponse.fromJson(Map<String, dynamic> json) {
     return CheckoutStripeResponse(
+      modoPago: json['modo_pago']?.toString() ?? 'LEGADO',
+      confirmacionPrueba: json['confirmacion_prueba'] == true,
       ordenId: json['orden_id'] is int
           ? json['orden_id']
           : int.parse(json['orden_id'].toString()),
@@ -57,13 +63,15 @@ class CrearCheckoutQrRequest {
   });
 
   Map<String, dynamic> toJson() => {
-        if (sucursalId != null) 'sucursal_id': sucursalId,
-        'tipo_entrega': tipoEntrega,
-        if (delivery != null) 'delivery': delivery!.toJson(),
-      };
+    if (sucursalId != null) 'sucursal_id': sucursalId,
+    'tipo_entrega': tipoEntrega,
+    if (delivery != null) 'delivery': delivery!.toJson(),
+  };
 }
 
 class CheckoutQrResponse {
+  final String modoPago;
+  final bool confirmacionPrueba;
   final int ordenId;
   final int ventaId;
   final double montoTotal;
@@ -78,6 +86,8 @@ class CheckoutQrResponse {
   final String vencimiento;
 
   const CheckoutQrResponse({
+    this.modoPago = 'LEGADO',
+    this.confirmacionPrueba = false,
     required this.ordenId,
     required this.ventaId,
     required this.montoTotal,
@@ -94,6 +104,8 @@ class CheckoutQrResponse {
 
   factory CheckoutQrResponse.fromJson(Map<String, dynamic> json) {
     return CheckoutQrResponse(
+      modoPago: json['modo_pago']?.toString() ?? 'LEGADO',
+      confirmacionPrueba: json['confirmacion_prueba'] == true,
       ordenId: _asInt(json['orden_id']),
       ventaId: _asInt(json['venta_id']),
       montoTotal: _asDouble(json['monto_total']),
@@ -111,6 +123,10 @@ class CheckoutQrResponse {
 }
 
 class OrdenPagoResponse {
+  final bool pagoRecibido;
+  final String? motivoIncidencia;
+  final String modoPago;
+  final bool confirmacionPrueba;
   final int ordenId;
   final int ventaId;
   final int? clienteId;
@@ -124,6 +140,10 @@ class OrdenPagoResponse {
   final String? fechaPago;
 
   const OrdenPagoResponse({
+    this.pagoRecibido = false,
+    this.motivoIncidencia,
+    this.modoPago = 'LEGADO',
+    this.confirmacionPrueba = false,
     required this.ordenId,
     required this.ventaId,
     this.clienteId,
@@ -139,6 +159,10 @@ class OrdenPagoResponse {
 
   factory OrdenPagoResponse.fromJson(Map<String, dynamic> json) {
     return OrdenPagoResponse(
+      pagoRecibido: json['pago_recibido'] == true,
+      motivoIncidencia: json['motivo_incidencia']?.toString(),
+      modoPago: json['modo_pago']?.toString() ?? 'LEGADO',
+      confirmacionPrueba: json['confirmacion_prueba'] == true,
       ordenId: json['orden_id'] is int
           ? json['orden_id']
           : int.parse(json['orden_id'].toString()),
@@ -161,8 +185,7 @@ class OrdenPagoResponse {
   }
 
   bool get pagado =>
-      estado.toUpperCase() == 'PAGADO' ||
-      estado.toUpperCase() == 'COMPLETADO';
+      estado.toUpperCase() == 'PAGADO' || estado.toUpperCase() == 'COMPLETADO';
 
   bool get pendiente => estado.toUpperCase() == 'PENDIENTE';
 
@@ -216,7 +239,9 @@ class PagoHistorialItem {
       clienteId: json['cliente_id'] == null ? null : _asInt(json['cliente_id']),
       clienteNombre: json['cliente_nombre']?.toString(),
       clienteCorreo: json['cliente_correo']?.toString(),
-      sucursalId: json['sucursal_id'] == null ? null : _asInt(json['sucursal_id']),
+      sucursalId: json['sucursal_id'] == null
+          ? null
+          : _asInt(json['sucursal_id']),
       sucursalNombre: json['sucursal_nombre']?.toString(),
       montoTotal: _asDouble(json['monto_total']),
       moneda: json['moneda']?.toString() ?? 'BOB',
@@ -230,6 +255,8 @@ class PagoHistorialItem {
 }
 
 class PagoProductoDetalle {
+  final String tipoCompra;
+  final int? paqueteOrigenId;
   final String producto;
   final String? categoria;
   final String? talla;
@@ -239,6 +266,8 @@ class PagoProductoDetalle {
   final double subtotal;
 
   const PagoProductoDetalle({
+    this.tipoCompra = 'UNIDAD',
+    this.paqueteOrigenId,
     required this.producto,
     this.categoria,
     this.talla,
@@ -250,6 +279,8 @@ class PagoProductoDetalle {
 
   factory PagoProductoDetalle.fromJson(Map<String, dynamic> json) {
     return PagoProductoDetalle(
+      tipoCompra: json['tipo_compra']?.toString() ?? 'UNIDAD',
+      paqueteOrigenId: (json['paquete_origen_id'] as num?)?.toInt(),
       producto: json['producto']?.toString() ?? '',
       categoria: json['categoria']?.toString(),
       talla: json['talla']?.toString(),
@@ -320,4 +351,5 @@ class PagoHistorialDetalle extends PagoHistorialItem {
 
 int _asInt(dynamic value) => value is int ? value : int.parse(value.toString());
 
-double _asDouble(dynamic value) => double.tryParse(value?.toString() ?? '0') ?? 0.0;
+double _asDouble(dynamic value) =>
+    double.tryParse(value?.toString() ?? '0') ?? 0.0;

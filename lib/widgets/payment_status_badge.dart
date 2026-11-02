@@ -19,6 +19,10 @@ class PaymentStatusVisual {
 
 PaymentStatusVisual paymentStatusVisual(String estado) {
   switch (estado.toUpperCase()) {
+    case 'REEMBOLSO_PENDIENTE':
+      return const PaymentStatusVisual(label:'Reembolso pendiente',description:'Se recibió el pago, pero la compra no se completó. El reintegro todavía no está confirmado.',icon:Icons.hourglass_empty,color:AppColors.warning,background:AppColors.warningSoft);
+    case 'REEMBOLSADO':
+      return const PaymentStatusVisual(label:'Reembolsado',description:'El reintegro fue confirmado. La compra no se completó.',icon:Icons.undo,color:AppColors.primary,background:AppColors.background);
     case 'PAGADO':
     case 'COMPLETADO':
     case 'COMPLETADA':

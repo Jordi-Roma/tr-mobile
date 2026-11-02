@@ -1,12 +1,25 @@
+import '../core/session/clave_pago.dart';
 import '../core/constants/api_constants.dart';
 import '../core/network/api_client.dart';
 import '../models/devolucion_models.dart';
 
 class DevolucionService {
   DevolucionService._();
+  static Future<Map<String, dynamic>> politica() async =>
+      await ApiClient.get('${ApiConstants.baseUrl}/posventa/politica')
+          as Map<String, dynamic>;
+  static Future<Devolucion> aceptar(int id, double monto) async {
+    final r = await ApiClient.post(
+      '${ApiConstants.baseUrl}/posventa/devoluciones/$id/aceptar',
+      body: {'monto': monto.toStringAsFixed(2)},
+    );
+    return Devolucion.fromJson(r as Map<String, dynamic>);
+  }
 
   static Future<List<VentaDevolucionElegible>> listarVentasElegibles() async {
-    final response = await ApiClient.get(ApiConstants.devolucionesVentasElegibles);
+    final response = await ApiClient.get(
+      ApiConstants.devolucionesVentasElegibles,
+    );
     return (response as List<dynamic>)
         .whereType<Map<String, dynamic>>()
         .map(VentaDevolucionElegible.fromJson)
@@ -15,7 +28,9 @@ class DevolucionService {
 
   static Future<List<Devolucion>> listarPropias({String? estado}) async {
     final query = estado != null && estado.isNotEmpty ? '?estado=$estado' : '';
-    final response = await ApiClient.get('${ApiConstants.misDevoluciones}$query');
+    final response = await ApiClient.get(
+      '${ApiConstants.misDevoluciones}$query',
+    );
     return (response as List<dynamic>)
         .whereType<Map<String, dynamic>>()
         .map(Devolucion.fromJson)
@@ -52,17 +67,21 @@ class DevolucionService {
   }) async {
     final response = await ApiClient.post(
       ApiConstants.solicitarDevolucion(ventaId),
-      body: {
+      body: await ClavePago.preparar({
         'motivo': motivo,
         if (observacion.trim().isNotEmpty) 'observacion': observacion.trim(),
         'items': items,
-      },
+      }, 'devolucion-$ventaId'),
     );
+    await ClavePago.finalizar('devolucion-$ventaId', 'SOLICITADA');
     return Devolucion.fromJson(response as Map<String, dynamic>);
   }
 
   static Future<Devolucion> cancelar(int id) async {
-    final response = await ApiClient.patch(ApiConstants.cancelarMiDevolucion(id), body: {});
+    final response = await ApiClient.patch(
+      ApiConstants.cancelarMiDevolucion(id),
+      body: {},
+    );
     return Devolucion.fromJson(response as Map<String, dynamic>);
   }
 
@@ -75,7 +94,8 @@ class DevolucionService {
       ApiConstants.revisarDevolucion(id),
       body: {
         'aprobar': aprobar,
-        if (observacion != null && observacion.trim().isNotEmpty) 'observacion': observacion.trim(),
+        if (observacion != null && observacion.trim().isNotEmpty)
+          'observacion': observacion.trim(),
       },
     );
     return Devolucion.fromJson(response as Map<String, dynamic>);
@@ -87,9 +107,7 @@ class DevolucionService {
   }) async {
     final response = await ApiClient.patch(
       ApiConstants.recepcionarDevolucion(id),
-      body: {
-        'items': items,
-      },
+      body: {'items': items},
     );
     return Devolucion.fromJson(response as Map<String, dynamic>);
   }
@@ -113,7 +131,8 @@ class DevolucionService {
       body: {
         'metodo': metodo,
         'referencia': referencia.trim(),
-        if (observacion != null && observacion.trim().isNotEmpty) 'observacion': observacion.trim(),
+        if (observacion != null && observacion.trim().isNotEmpty)
+          'observacion': observacion.trim(),
       },
     );
     return Devolucion.fromJson(response as Map<String, dynamic>);

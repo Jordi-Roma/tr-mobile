@@ -165,7 +165,7 @@ class _DetallePagoScreenState extends State<DetallePagoScreen> {
         ...pago.productos.map((producto) => Card(
               child: ListTile(
                 title: Text(
-                  producto.producto,
+                  '${producto.producto} · ${producto.tipoCompra}${producto.paqueteOrigenId == null ? '' : ' #${producto.paqueteOrigenId}'}',
                   style: const TextStyle(fontWeight: FontWeight.w800),
                 ),
                 subtitle: Text(

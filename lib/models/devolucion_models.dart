@@ -17,7 +17,8 @@ class VentaDevolucionDetalle {
     required this.subtotal,
   });
 
-  factory VentaDevolucionDetalle.fromJson(Map<String, dynamic> json) => VentaDevolucionDetalle(
+  factory VentaDevolucionDetalle.fromJson(Map<String, dynamic> json) =>
+      VentaDevolucionDetalle(
         ventaDetalleId: _int(json['venta_detalle_id']),
         producto: json['producto']?.toString() ?? '',
         talla: json['talla']?.toString() ?? '',
@@ -45,7 +46,8 @@ class VentaDevolucionElegible {
     required this.detalles,
   });
 
-  factory VentaDevolucionElegible.fromJson(Map<String, dynamic> json) => VentaDevolucionElegible(
+  factory VentaDevolucionElegible.fromJson(Map<String, dynamic> json) =>
+      VentaDevolucionElegible(
         ventaId: _int(json['venta_id']),
         codigo: json['venta_codigo']?.toString() ?? '',
         sucursal: json['sucursal']?.toString() ?? '',
@@ -66,6 +68,7 @@ class DevolucionDetalle {
   final int cantidadSolicitada;
   final int cantidadAceptada;
   final int cantidadRechazada;
+  final int cantidadNoVendible;
   final double montoAprobado;
 
   const DevolucionDetalle({
@@ -76,10 +79,12 @@ class DevolucionDetalle {
     required this.cantidadSolicitada,
     required this.cantidadAceptada,
     required this.cantidadRechazada,
+    this.cantidadNoVendible = 0,
     required this.montoAprobado,
   });
 
-  factory DevolucionDetalle.fromJson(Map<String, dynamic> json) => DevolucionDetalle(
+  factory DevolucionDetalle.fromJson(Map<String, dynamic> json) =>
+      DevolucionDetalle(
         id: _int(json['id']),
         producto: json['producto']?.toString() ?? '',
         talla: json['talla']?.toString() ?? '',
@@ -87,11 +92,14 @@ class DevolucionDetalle {
         cantidadSolicitada: _int(json['cantidad_solicitada']),
         cantidadAceptada: _int(json['cantidad_aceptada']),
         cantidadRechazada: _int(json['cantidad_rechazada']),
+        cantidadNoVendible: _int(json['cantidad_no_vendible']),
         montoAprobado: _double(json['monto_aprobado']),
       );
 }
 
 class Devolucion {
+  final String? aceptadaClienteEn;
+  final Map<String, dynamic>? comprobante;
   final int id;
   final String codigo;
   final int ventaId;
@@ -115,6 +123,8 @@ class Devolucion {
   final List<DevolucionDetalle> detalles;
 
   const Devolucion({
+    this.aceptadaClienteEn,
+    this.comprobante,
     required this.id,
     required this.codigo,
     this.ventaId = 0,
@@ -139,32 +149,35 @@ class Devolucion {
   });
 
   factory Devolucion.fromJson(Map<String, dynamic> json) => Devolucion(
-        id: _int(json['id']),
-        codigo: json['codigo']?.toString() ?? '',
-        ventaId: _int(json['venta_id']),
-        ventaCodigo: json['venta_codigo']?.toString() ?? '',
-        clienteNombre: json['cliente_nombre']?.toString(),
-        clienteCorreo: json['cliente_correo']?.toString(),
-        sucursal: json['sucursal']?.toString() ?? '',
-        estado: json['estado']?.toString() ?? '',
-        motivo: json['motivo']?.toString() ?? '',
-        observacion: json['observacion']?.toString(),
-        montoSolicitado: _double(json['monto_solicitado']),
-        montoAprobado: _double(json['monto_aprobado']),
-        metodoPagoOriginal: json['metodo_pago_original']?.toString(),
-        proveedorPagoOriginal: json['proveedor_pago_original']?.toString(),
-        metodoReembolso: json['metodo_reembolso']?.toString(),
-        referenciaReembolso: json['referencia_reembolso']?.toString(),
-        fechaSolicitud: json['fecha_solicitud']?.toString() ?? '',
-        fechaRevision: json['fecha_revision']?.toString(),
-        fechaRecepcion: json['fecha_recepcion']?.toString(),
-        fechaReembolso: json['fecha_reembolso']?.toString(),
-        detalles: (json['detalles'] as List<dynamic>? ?? [])
-            .whereType<Map<String, dynamic>>()
-            .map(DevolucionDetalle.fromJson)
-            .toList(),
-      );
+    aceptadaClienteEn: json['aceptada_cliente_en']?.toString(),
+    comprobante: json['comprobante'] as Map<String, dynamic>?,
+    id: _int(json['id']),
+    codigo: json['codigo']?.toString() ?? '',
+    ventaId: _int(json['venta_id']),
+    ventaCodigo: json['venta_codigo']?.toString() ?? '',
+    clienteNombre: json['cliente_nombre']?.toString(),
+    clienteCorreo: json['cliente_correo']?.toString(),
+    sucursal: json['sucursal']?.toString() ?? '',
+    estado: json['estado']?.toString() ?? '',
+    motivo: json['motivo']?.toString() ?? '',
+    observacion: json['observacion']?.toString(),
+    montoSolicitado: _double(json['monto_solicitado']),
+    montoAprobado: _double(json['monto_aprobado']),
+    metodoPagoOriginal: json['metodo_pago_original']?.toString(),
+    proveedorPagoOriginal: json['proveedor_pago_original']?.toString(),
+    metodoReembolso: json['metodo_reembolso']?.toString(),
+    referenciaReembolso: json['referencia_reembolso']?.toString(),
+    fechaSolicitud: json['fecha_solicitud']?.toString() ?? '',
+    fechaRevision: json['fecha_revision']?.toString(),
+    fechaRecepcion: json['fecha_recepcion']?.toString(),
+    fechaReembolso: json['fecha_reembolso']?.toString(),
+    detalles: (json['detalles'] as List<dynamic>? ?? [])
+        .whereType<Map<String, dynamic>>()
+        .map(DevolucionDetalle.fromJson)
+        .toList(),
+  );
 }
 
-int _int(dynamic value) => value is int ? value : int.tryParse(value?.toString() ?? '') ?? 0;
+int _int(dynamic value) =>
+    value is int ? value : int.tryParse(value?.toString() ?? '') ?? 0;
 double _double(dynamic value) => double.tryParse(value?.toString() ?? '0') ?? 0;

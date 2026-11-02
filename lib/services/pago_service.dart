@@ -1,3 +1,4 @@
+import '../core/session/clave_pago.dart';
 import '../core/constants/api_constants.dart';
 import '../core/network/api_client.dart';
 import '../models/pago_models.dart';
@@ -12,13 +13,20 @@ class PagoService {
     int? sucursalId,
     String tipoEntrega = 'RECOJO_SUCURSAL',
     DeliveryCheckoutRequest? delivery,
+    double? totalEsperado,
   }) async {
     final body = CrearCheckoutStripeRequest(
       sucursalId: sucursalId,
       tipoEntrega: tipoEntrega,
       delivery: delivery,
     ).toJson();
-    final res = await ApiClient.post(ApiConstants.pagoStripeCheckout, body: body);
+    if (totalEsperado != null) {
+      body['total_esperado'] = totalEsperado.toStringAsFixed(2);
+    }
+    final res = await ApiClient.post(
+      ApiConstants.pagoStripeCheckout,
+      body: await ClavePago.preparar(body, 'stripe'),
+    );
     return CheckoutStripeResponse.fromJson(res as Map<String, dynamic>);
   }
 
@@ -27,26 +35,46 @@ class PagoService {
     int? sucursalId,
     String tipoEntrega = 'RECOJO_SUCURSAL',
     DeliveryCheckoutRequest? delivery,
+    double? totalEsperado,
   }) async {
     final body = CrearCheckoutQrRequest(
       sucursalId: sucursalId,
       tipoEntrega: tipoEntrega,
       delivery: delivery,
     ).toJson();
-    final res = await ApiClient.post(ApiConstants.pagoQrCheckout, body: body);
+    if (totalEsperado != null) {
+      body['total_esperado'] = totalEsperado.toStringAsFixed(2);
+    }
+    final res = await ApiClient.post(
+      ApiConstants.pagoQrCheckout,
+      body: await ClavePago.preparar(body, 'qr'),
+    );
     return CheckoutQrResponse.fromJson(res as Map<String, dynamic>);
   }
 
   /// Confirma un pago QR una vez que el cliente realizó la transferencia.
   static Future<OrdenPagoResponse> confirmarPagoQr(int ordenId) async {
-    final res = await ApiClient.post(ApiConstants.pagoQrConfirmar(ordenId), body: {});
-    return OrdenPagoResponse.fromJson(res as Map<String, dynamic>);
+    final res = await ApiClient.post(
+      ApiConstants.pagoQrConfirmar(ordenId),
+      body: {},
+    );
+    final orden = OrdenPagoResponse.fromJson(res as Map<String, dynamic>);
+    await ClavePago.finalizar(
+      orden.proveedor == 'STRIPE' ? 'stripe' : 'qr',
+      orden.estado,
+    );
+    return orden;
   }
 
   /// Obtiene el estado actual de una orden de pago.
   static Future<OrdenPagoResponse> obtenerOrden(int ordenId) async {
     final res = await ApiClient.get(ApiConstants.pagoOrden(ordenId));
-    return OrdenPagoResponse.fromJson(res as Map<String, dynamic>);
+    final orden = OrdenPagoResponse.fromJson(res as Map<String, dynamic>);
+    await ClavePago.finalizar(
+      orden.proveedor == 'STRIPE' ? 'stripe' : 'qr',
+      orden.estado,
+    );
+    return orden;
   }
 
   /// Confirma un pago en modo prueba (aprobar o rechazar).
@@ -58,7 +86,34 @@ class PagoService {
       ApiConstants.pagoConfirmarPrueba(ordenId),
       body: {'aprobar': aprobar},
     );
-    return OrdenPagoResponse.fromJson(res as Map<String, dynamic>);
+    final orden = OrdenPagoResponse.fromJson(res as Map<String, dynamic>);
+    await ClavePago.finalizar(
+      orden.proveedor == 'STRIPE' ? 'stripe' : 'qr',
+      orden.estado,
+    );
+    return orden;
+  }
+
+  static Future<OrdenPagoResponse?> pendiente() async {
+    final res = await ApiClient.get(
+      '${ApiConstants.baseUrl}/pagos-empresa/pendiente',
+    );
+    return res == null
+        ? null
+        : OrdenPagoResponse.fromJson(res as Map<String, dynamic>);
+  }
+
+  static Future<OrdenPagoResponse> cancelar(int id) async {
+    final res = await ApiClient.post(
+      '${ApiConstants.baseUrl}/pagos-empresa/ordenes/$id/cancelar',
+      body: {},
+    );
+    final orden = OrdenPagoResponse.fromJson(res as Map<String, dynamic>);
+    await ClavePago.finalizar(
+      orden.proveedor == 'STRIPE' ? 'stripe' : 'qr',
+      orden.estado,
+    );
+    return orden;
   }
 
   static Future<List<PagoHistorialItem>> listarMisPagos() async {
