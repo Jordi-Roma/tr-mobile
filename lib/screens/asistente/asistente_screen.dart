@@ -1,3 +1,6 @@
+import '../../core/session/contexto_sesion.dart';
+import 'datos_chat.dart';
+
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
@@ -10,10 +13,11 @@ import '../../services/asistente_service.dart';
 import '../../services/voz_service.dart';
 import '../auth/login_screen.dart';
 
-/// Pantalla del asistente virtual IA (CU23).
+/// Asistente de catálogo y operaciones propias (CU24).
 /// Puede usarse desde cualquier pantalla como hoja modal.
 class AsistenteScreen extends StatefulWidget {
-  const AsistenteScreen({super.key});
+  const AsistenteScreen({super.key, this.contextoInicial});
+  final AsistenteContexto? contextoInicial;
 
   @override
   State<AsistenteScreen> createState() => _AsistenteScreenState();
@@ -28,12 +32,36 @@ class _AsistenteScreenState extends State<AsistenteScreen>
   final List<_MensajeChat> _mensajes = [];
   bool _enviando = false;
   bool _escuchando = false;
+  AsistenteContexto? _contexto;
+  int _generacion = ContextoSesion.instance.generacion;
+  DateTime? _esperarHasta;
+  String? _aviso;
+  void _cambioSesion() {
+    if (_generacion == ContextoSesion.instance.generacion) return;
+    _generacion = ContextoSesion.instance.generacion;
+    VozService.cancelar();
+    if (mounted) {
+      setState(() {
+        _mensajes.clear();
+        _contexto = null;
+        _mensajeCtrl.clear();
+        _enviando = false;
+        _escuchando = false;
+        _aviso = 'Cambió la sesión. Inicia una nueva consulta.';
+      });
+    }
+  }
+
+  void _seleccionar(AsistenteContexto c) {
+    if (_enviando) return;
+    setState(() => _contexto = c);
+  }
 
   static const _sugerencias = [
     '¿Qué camisetas tienen en talla M?',
     '¿Cómo hago una reserva?',
     '¿Cómo funciona el delivery?',
-    '¿Cómo pago con Stripe?',
+    '¿Qué medios de pago están disponibles?',
     '¿Cómo uso el carrito?',
     '¿Dónde veo mis pagos?',
     '¿Cómo guardo favoritos?',
@@ -43,11 +71,14 @@ class _AsistenteScreenState extends State<AsistenteScreen>
   @override
   void initState() {
     super.initState();
+    _contexto = widget.contextoInicial;
+    ContextoSesion.instance.addListener(_cambioSesion);
     _agregarMensajeBienvenida();
   }
 
   @override
   void dispose() {
+    ContextoSesion.instance.removeListener(_cambioSesion);
     VozService.cancelar();
     _scrollController.dispose();
     _mensajeCtrl.dispose();
@@ -73,7 +104,12 @@ class _AsistenteScreenState extends State<AsistenteScreen>
 
   Future<void> _enviarMensaje([String? textoFijo]) async {
     final texto = textoFijo ?? _mensajeCtrl.text.trim();
-    if (texto.isEmpty || _enviando) return;
+    if (texto.isEmpty || texto.length > 600 || _enviando) return;
+    if (_esperarHasta?.isAfter(DateTime.now()) == true) {
+      setState(() => _aviso = 'Espera antes de enviar otra consulta.');
+      return;
+    }
+    final gen = _generacion;
 
     _mensajeCtrl.clear();
     _focusNode.unfocus();
@@ -82,6 +118,7 @@ class _AsistenteScreenState extends State<AsistenteScreen>
 
     setState(() {
       _enviando = true;
+      _aviso = null;
       _mensajes.add(
         _MensajeChat(
           texto: texto,
@@ -96,15 +133,18 @@ class _AsistenteScreenState extends State<AsistenteScreen>
     try {
       final response = await AsistenteService.chat(
         mensaje: texto,
+        contexto: _contexto,
         estaAutenticado: auth.estaAutenticado,
       );
 
-      if (!mounted) return;
+      if (!mounted || gen != _generacion) return;
 
       setState(() {
+        _contexto = response.contexto;
         _mensajes.add(
           _MensajeChat(
             texto: response.respuesta,
+            respuesta: response,
             esAsistente: true,
             timestamp: DateTime.now(),
             productos: response.productos,
@@ -117,11 +157,21 @@ class _AsistenteScreenState extends State<AsistenteScreen>
 
       _scrollAlFinal();
     } on ApiException catch (e) {
-      if (!mounted) return;
+      if (e.statusCode == 429) {
+        _esperarHasta = DateTime.now().add(
+          Duration(seconds: e.retryAfter ?? 60),
+        );
+      }
+      if (mounted && gen == _generacion) _mensajeCtrl.text = texto;
+      if (!mounted || gen != _generacion) return;
       setState(() {
         _mensajes.add(
           _MensajeChat(
-            texto: 'Error: ${e.message}',
+            texto: e.statusCode == 429
+                ? 'Espera ${e.retryAfter ?? 60} segundos antes de reintentar.'
+                : e.statusCode == 401
+                ? 'La sesión ya no es válida. Inicia sesión nuevamente.'
+                : e.message,
             esAsistente: true,
             timestamp: DateTime.now(),
             esError: true,
@@ -130,7 +180,7 @@ class _AsistenteScreenState extends State<AsistenteScreen>
       });
       _scrollAlFinal();
     } catch (_) {
-      if (!mounted) return;
+      if (!mounted || gen != _generacion) return;
       setState(() {
         _mensajes.add(
           _MensajeChat(
@@ -143,7 +193,7 @@ class _AsistenteScreenState extends State<AsistenteScreen>
       });
       _scrollAlFinal();
     } finally {
-      if (mounted) setState(() => _enviando = false);
+      if (mounted && gen == _generacion) setState(() => _enviando = false);
     }
   }
 
@@ -161,6 +211,7 @@ class _AsistenteScreenState extends State<AsistenteScreen>
 
   Future<void> _alternarDictado() async {
     if (_enviando) return;
+    final gen = _generacion;
 
     if (_escuchando) {
       await VozService.cancelar();
@@ -175,7 +226,7 @@ class _AsistenteScreenState extends State<AsistenteScreen>
     setState(() => _escuchando = true);
     await VozService.escuchar(
       onTexto: (texto, finalizado) {
-        if (!mounted) return;
+        if (!mounted || gen != _generacion) return;
         setState(() {
           _mensajeCtrl.text = texto;
           _mensajeCtrl.selection = TextSelection.fromPosition(
@@ -190,7 +241,7 @@ class _AsistenteScreenState extends State<AsistenteScreen>
         }
       },
       onError: (mensaje) {
-        if (!mounted) return;
+        if (!mounted || gen != _generacion) return;
         setState(() {
           _escuchando = false;
           _mensajes.add(
@@ -214,6 +265,25 @@ class _AsistenteScreenState extends State<AsistenteScreen>
       appBar: _buildAppBar(),
       body: Column(
         children: [
+          if (_aviso != null) Text(_aviso!),
+          ListTile(
+            title: Text(
+              _contexto?.recursoTipo != null
+                  ? '${_contexto!.recursoTipo} #${_contexto!.recursoId}'
+                  : _contexto?.productoId != null
+                  ? 'Prenda #${_contexto!.productoId}'
+                  : 'Sin selección',
+            ),
+            trailing: TextButton(
+              onPressed: _enviando
+                  ? null
+                  : () => setState(() {
+                      _contexto = null;
+                      _mensajes.clear();
+                    }),
+              child: const Text('Nueva consulta'),
+            ),
+          ),
           Expanded(child: _buildListaMensajes()),
           if (_mensajes.length <= 1) _buildSugerencias(),
           _buildInputBar(),
@@ -290,6 +360,7 @@ class _AsistenteScreenState extends State<AsistenteScreen>
       itemCount: _mensajes.length,
       itemBuilder: (_, i) => _BurbujaMensaje(
         mensaje: _mensajes[i],
+        onSeleccionar: _seleccionar,
         onIniciarSesion: () {
           Navigator.of(context)
               .push(MaterialPageRoute(builder: (_) => const LoginScreen()));
@@ -374,6 +445,7 @@ class _AsistenteScreenState extends State<AsistenteScreen>
               child: TextField(
                 controller: _mensajeCtrl,
                 focusNode: _focusNode,
+                maxLength: 600,
                 maxLines: 4,
                 minLines: 1,
                 textInputAction: TextInputAction.send,
@@ -459,6 +531,7 @@ class _MensajeChat {
   final List<AsistenteAccionResponse> acciones;
   final bool requiereLogin;
   final bool esError;
+  final AsistenteChatResponse? respuesta;
 
   const _MensajeChat({
     required this.texto,
@@ -469,6 +542,7 @@ class _MensajeChat {
     this.acciones = const [],
     this.requiereLogin = false,
     this.esError = false,
+    this.respuesta,
   });
 }
 
@@ -477,8 +551,12 @@ class _MensajeChat {
 class _BurbujaMensaje extends StatelessWidget {
   final _MensajeChat mensaje;
   final VoidCallback? onIniciarSesion;
-
-  const _BurbujaMensaje({required this.mensaje, this.onIniciarSesion});
+  final ValueChanged<AsistenteContexto> onSeleccionar;
+  const _BurbujaMensaje({
+    required this.mensaje,
+    this.onIniciarSesion,
+    required this.onSeleccionar,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -550,7 +628,7 @@ class _BurbujaMensaje extends StatelessWidget {
             ),
             child: _buildTextoConMarkdown(
               mensaje.texto,
-              esChatBot: mensaje.esAsistente && !mensaje.esError,
+              esChatBot: mensaje.esAsistente,
             ),
           ),
 
@@ -566,6 +644,7 @@ class _BurbujaMensaje extends StatelessWidget {
             _ListaProductosChat(
               titulo: 'Resultados',
               productos: mensaje.productos,
+              onSeleccionar: onSeleccionar,
             ),
           ],
 
@@ -575,9 +654,12 @@ class _BurbujaMensaje extends StatelessWidget {
             _ListaProductosChat(
               titulo: 'También te puede interesar',
               productos: mensaje.alternativas,
+              onSeleccionar: onSeleccionar,
             ),
           ],
 
+          if (mensaje.respuesta case final r?)
+            DatosChat(respuesta: r, onSeleccionar: onSeleccionar),
           // Timestamp
           Padding(
             padding: const EdgeInsets.only(top: 4, left: 4, right: 4),
@@ -665,118 +747,61 @@ class _TarjetaLoginRequerido extends StatelessWidget {
 // ─── Lista horizontal de productos en el chat ─────────────────────────────────
 
 class _ListaProductosChat extends StatelessWidget {
+  const _ListaProductosChat({
+    required this.titulo,
+    required this.productos,
+    required this.onSeleccionar,
+  });
   final String titulo;
   final List<AsistenteProductoResponse> productos;
-
-  const _ListaProductosChat({required this.titulo, required this.productos});
-
+  final ValueChanged<AsistenteContexto> onSeleccionar;
   @override
-  Widget build(BuildContext context) {
-    final currencyFormat = NumberFormat.currency(
-      locale: 'es_BO',
-      symbol: 'Bs. ',
-    );
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Padding(
-          padding: const EdgeInsets.only(left: 4, bottom: 6),
-          child: Text(
-            titulo,
-            style: const TextStyle(
-              fontSize: 11,
-              fontWeight: FontWeight.w700,
-              color: AppColors.textSecondary,
+  Widget build(BuildContext context) => Column(
+    crossAxisAlignment: CrossAxisAlignment.start,
+    children: [
+      Text(titulo),
+      ...productos.map(
+        (p) => Card(
+          child: Padding(
+            padding: const EdgeInsets.all(12),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  p.nombre,
+                  style: const TextStyle(fontWeight: FontWeight.bold),
+                ),
+                Text(
+                  [
+                    p.talla,
+                    p.color,
+                    p.sucursal,
+                  ].whereType<String>().join(' · '),
+                ),
+                Text(p.precioMostrado),
+                if (p.promocion != null) const Text('Promoción aplicada'),
+                if (p.stockReal != null)
+                  Text(
+                    '${p.stockReal} disponible(s). Consultar no reserva unidades.',
+                  ),
+                if (p.descripcion != null) Text(p.descripcion!),
+                if (p.material != null) Text(p.material!),
+                if (p.motivo != null) Text(p.motivo!),
+                TextButton(
+                  onPressed: () => onSeleccionar(
+                    AsistenteContexto(
+                      productoId: p.productoId,
+                      varianteId: p.varianteId,
+                      sucursalId: p.sucursalId,
+                    ),
+                  ),
+                  child: const Text('Consultar esta variante'),
+                ),
+              ],
             ),
           ),
         ),
-        SizedBox(
-          height: 130,
-          child: ListView.separated(
-            scrollDirection: Axis.horizontal,
-            itemCount: productos.length,
-            separatorBuilder: (_, _) => const SizedBox(width: 8),
-            itemBuilder: (_, i) {
-              final p = productos[i];
-              return Container(
-                width: 160,
-                padding: const EdgeInsets.all(10),
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(10),
-                  border: Border.all(color: AppColors.border),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black.withValues(alpha: 0.04),
-                      blurRadius: 4,
-                    ),
-                  ],
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    // Icono
-                    Container(
-                      width: 36,
-                      height: 36,
-                      decoration: BoxDecoration(
-                        color: AppColors.accentSoft,
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      child: const Icon(
-                        Icons.checkroom,
-                        color: AppColors.accent,
-                        size: 20,
-                      ),
-                    ),
-                    const SizedBox(height: 6),
-                    Text(
-                      p.nombre,
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
-                        fontSize: 11,
-                        fontWeight: FontWeight.w700,
-                        color: AppColors.textPrimary,
-                      ),
-                    ),
-                    if (p.talla != null || p.color != null)
-                      Text(
-                        [
-                          if (p.talla != null) p.talla!,
-                          if (p.color != null) p.color!,
-                        ].join(' • '),
-                        style: const TextStyle(
-                          fontSize: 10,
-                          color: AppColors.textSecondary,
-                        ),
-                      ),
-                    const Spacer(),
-                    if (p.precioVigente != null)
-                      Text(
-                        currencyFormat.format(p.precioVigente),
-                        style: const TextStyle(
-                          fontSize: 11,
-                          fontWeight: FontWeight.w700,
-                          color: AppColors.accent,
-                        ),
-                      ),
-                    if (p.stockDisponible != null)
-                      Text(
-                        'Stock: ${p.stockDisponible}',
-                        style: const TextStyle(
-                          fontSize: 10,
-                          color: AppColors.textSecondary,
-                        ),
-                      ),
-                  ],
-                ),
-              );
-            },
-          ),
-        ),
-      ],
-    );
-  }
+      ),
+    ],
+  );
 }

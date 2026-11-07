@@ -56,7 +56,9 @@ class _LoginScreenState extends State<LoginScreen> {
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
                   Text(
-                    auth.empresa?.nombre ?? 'StyleAR',
+                    auth.modoPlataforma
+                        ? 'Plataforma StyleAR'
+                        : auth.empresa?.nombre ?? 'StyleAR',
                     style: TextStyle(
                       fontFamily: 'Playfair Display',
                       fontSize: 36,
@@ -67,9 +69,11 @@ class _LoginScreenState extends State<LoginScreen> {
                     textAlign: TextAlign.center,
                   ),
                   const SizedBox(height: 8),
-                  const Text(
-                    'Ingresa tus credenciales para acceder a tu cuenta y gestionar tus reservas.',
-                    style: TextStyle(
+                  Text(
+                    auth.modoPlataforma
+                        ? 'Ingresa con tu cuenta de administrador SaaS.'
+                        : 'Ingresa tus credenciales para acceder a tu cuenta y gestionar tus reservas.',
+                    style: const TextStyle(
                       fontSize: 14,
                       color: AppColors.textSecondary,
                     ),
@@ -82,17 +86,23 @@ class _LoginScreenState extends State<LoginScreen> {
                       padding: const EdgeInsets.only(bottom: 16),
                       child: Text(auth.aviso!),
                     ),
-                  TextButton(
-                    onPressed: auth.cargando
-                        ? null
-                        : () => Navigator.of(context).push(
-                            MaterialPageRoute<void>(
-                              builder: (_) => const RecuperarPasswordScreen(),
+                  if (!auth.modoPlataforma)
+                    TextButton(
+                      onPressed: auth.cargando
+                          ? null
+                          : () => Navigator.of(context).push(
+                              MaterialPageRoute<void>(
+                                builder: (_) => const RecuperarPasswordScreen(),
+                              ),
                             ),
-                          ),
-                    child: const Text('¿Olvidaste tu contraseña?'),
-                  ),
-                  if (auth.requiereLogin)
+                      child: const Text('¿Olvidaste tu contraseña?'),
+                    ),
+                  if (auth.modoPlataforma)
+                    TextButton(
+                      onPressed: auth.cargando ? null : auth.cambiarEmpresa,
+                      child: const Text('Volver a las tiendas'),
+                    ),
+                  if (auth.requiereLogin && !auth.modoPlataforma)
                     TextButton(
                       onPressed: auth.cargando ? null : auth.continuarVisitante,
                       child: const Text('Continuar como visitante'),
@@ -171,36 +181,37 @@ class _LoginScreenState extends State<LoginScreen> {
                   const SizedBox(height: 24),
 
                   // Enlace a Registro
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      const Text(
-                        '¿Aún no tienes cuenta? ',
-                        style: TextStyle(
-                          fontSize: 13,
-                          color: AppColors.textSecondary,
-                        ),
-                      ),
-                      GestureDetector(
-                        onTap: () {
-                          auth.limpiarError();
-                          Navigator.of(context).push(
-                            MaterialPageRoute(
-                              builder: (_) => const RegistroScreen(),
-                            ),
-                          );
-                        },
-                        child: const Text(
-                          'Regístrate aquí',
+                  if (!auth.modoPlataforma)
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        const Text(
+                          '¿Aún no tienes cuenta? ',
                           style: TextStyle(
                             fontSize: 13,
-                            fontWeight: FontWeight.w700,
-                            color: AppColors.primary,
+                            color: AppColors.textSecondary,
                           ),
                         ),
-                      ),
-                    ],
-                  ),
+                        GestureDetector(
+                          onTap: () {
+                            auth.limpiarError();
+                            Navigator.of(context).push(
+                              MaterialPageRoute(
+                                builder: (_) => const RegistroScreen(),
+                              ),
+                            );
+                          },
+                          child: const Text(
+                            'Regístrate aquí',
+                            style: TextStyle(
+                              fontSize: 13,
+                              fontWeight: FontWeight.w700,
+                              color: AppColors.primary,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
                 ],
               ),
             ),

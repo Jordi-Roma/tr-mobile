@@ -12,6 +12,7 @@ class ApiClient {
   ApiClient._();
   static http.Client client = http.Client();
   static final _contexto = ContextoSesion.instance;
+  static final cambiosPlan = StreamController<int>.broadcast();
 
   static bool esApi(Uri uri) {
     final base = Uri.parse(ApiConstants.baseUrl);
@@ -33,7 +34,20 @@ class ApiClient {
     };
     if (!esApi(uri)) return headers;
     if (uri.path.contains('/empresas/public')) return headers;
-    if (_contexto.empresa == null) {
+    final plataforma = _contexto.modoPlataforma;
+    if (plataforma &&
+        !uri.path.contains('/saas/') &&
+        !uri.path.contains('/autenticacion/') &&
+        uri.path != '${Uri.parse(ApiConstants.baseUrl).path}/perfil' &&
+        !uri.path.startsWith(
+          '${Uri.parse(ApiConstants.baseUrl).path}/perfil/',
+        )) {
+      throw ApiException(
+        'Esta operación pertenece a una tienda.',
+        statusCode: 403,
+      );
+    }
+    if (_contexto.empresa == null && !plataforma) {
       throw ApiException(
         'Selecciona una empresa antes de continuar.',
         statusCode: 400,
@@ -54,6 +68,7 @@ class ApiClient {
       throw ApiException('Tu sesión venció.', statusCode: 401);
     }
     if (_contexto.usuario != null &&
+        !plataforma &&
         (_contexto.usuario!.empresaId != _contexto.empresa!.id ||
             _contexto.usuario!.empresaCodigo != _contexto.empresa!.codigo)) {
       throw ApiException(
@@ -61,7 +76,7 @@ class ApiClient {
         statusCode: 403,
       );
     }
-    headers['X-Empresa-Codigo'] = _contexto.empresa!.codigo;
+    if (!plataforma) headers['X-Empresa-Codigo'] = _contexto.empresa!.codigo;
     if (withAuth && _contexto.token != null) {
       headers['Authorization'] = 'Bearer ${_contexto.token!}';
     }
@@ -102,6 +117,16 @@ class ApiClient {
         'No se pudo completar la solicitud (${response.statusCode}).';
     if (decoded is Map<String, dynamic>) {
       final detail = decoded['detail'];
+      if (propia &&
+          detail is Map &&
+          [
+            'SUSCRIPCION_NO_VIGENTE',
+            'FUNCION_NO_INCLUIDA',
+            'CUPO_AGOTADO',
+            'LIMITE_USUARIOS',
+          ].contains(detail['codigo'])) {
+        cambiosPlan.add(_contexto.generacion);
+      }
       if (detail is String) {
         mensaje = detail;
       } else if (detail is Map && detail['mensaje'] is String) {
@@ -115,7 +140,12 @@ class ApiClient {
         if (errores.isNotEmpty) mensaje = errores;
       }
     }
-    throw ApiException(mensaje, statusCode: response.statusCode, data: decoded);
+    throw ApiException(
+      mensaje,
+      statusCode: response.statusCode,
+      data: decoded,
+      retryAfter: int.tryParse(response.headers['retry-after'] ?? ''),
+    );
   }
 
   static Future<http.Response> _solicitar(
@@ -164,11 +194,19 @@ class ApiClient {
       withAuth: withAuth,
     );
     validarGeneracion(generacion);
-    return procesarRespuesta(
+    final resultado = procesarRespuesta(
       response,
       withAuth: withAuth,
       propia: esApi(Uri.parse(url)),
     );
+    if (!['GET', 'HEAD', 'OPTIONS'].contains(metodo.toUpperCase()) &&
+        esApi(Uri.parse(url)) &&
+        RegExp(
+          r'/api/v1/(usuarios|empleados|sucursales|respaldos|reportes/programados)(/|$)',
+        ).hasMatch(Uri.parse(url).path)) {
+      cambiosPlan.add(generacion);
+    }
+    return resultado;
   }
 
   static Future<dynamic> get(

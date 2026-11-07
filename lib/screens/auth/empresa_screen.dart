@@ -75,6 +75,12 @@ class _EmpresaScreenState extends State<EmpresaScreen> {
         child: ListView(
           padding: const EdgeInsets.all(24),
           children: [
+            OutlinedButton.icon(
+              onPressed: auth.cargando ? null : auth.abrirPlataforma,
+              icon: const Icon(Icons.admin_panel_settings_outlined),
+              label: const Text('Administración de la plataforma'),
+            ),
+            const SizedBox(height: 20),
             Text(
               'Elige una empresa',
               style: Theme.of(context).textTheme.headlineMedium,

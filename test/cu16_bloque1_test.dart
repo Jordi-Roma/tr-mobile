@@ -110,15 +110,24 @@ void main() {
         ]);
       }
       if (fallo) return jsonRespuesta({'detail': 'Temporal'}, 503);
-      return jsonRespuesta([
-        {
-          'id': 1,
-          'titulo': 'Pago recibido',
-          'mensaje': 'Consulta tu orden',
-          'leida': leida,
-          'orden_id': 1,
-        },
-      ]);
+      expect(r.url.path, endsWith('/notificaciones/bandeja'));
+      return jsonRespuesta({
+        'avisos': [
+          {
+            'id': 1,
+            'titulo': 'Pago recibido',
+            'mensaje': 'Consulta tu orden',
+            'leida': leida,
+            'orden_id': 1,
+            'categoria': 'PAGO',
+            'creado_en': '2026-11-07T12:00:00Z',
+          },
+        ],
+        'total': 1,
+        'no_leidas': leida ? 0 : 1,
+        'pagina': 1,
+        'tamano': 20,
+      });
     });
     await tester.pumpWidget(const MaterialApp(home: NotificacionesScreen()));
     await tester.pumpAndSettle();
@@ -132,7 +141,7 @@ void main() {
     expect(leida, true);
     await tester.tap(find.text('Activar avisos push'));
     await tester.pumpAndSettle();
-    expect(find.textContaining('Firebase está pendiente'), findsOneWidget);
+    expect(find.textContaining('La bandeja está disponible'), findsOneWidget);
     await tester.pumpWidget(const SizedBox());
   });
 }

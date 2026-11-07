@@ -1,3 +1,5 @@
+import '../respaldos/respaldos_screen.dart';
+import 'mi_plan_screen.dart';
 import '../pagos/cambios_screen.dart';
 import '../notificaciones/notificaciones_screen.dart';
 import 'editar_perfil_screen.dart';
@@ -422,6 +424,28 @@ class _PerfilScreenState extends State<PerfilScreen> {
               Card(
                 child: Column(
                   children: [
+                    if (auth.esAdmin)
+                      ListTile(
+                        leading: const Icon(Icons.backup_outlined),
+                        title: const Text('Respaldos de mi empresa'),
+                        trailing: const Icon(Icons.chevron_right),
+                        onTap: () => Navigator.of(context).push(
+                          MaterialPageRoute(
+                            builder: (_) => const RespaldosScreen(),
+                          ),
+                        ),
+                      ),
+                    if (auth.esAdmin)
+                      ListTile(
+                        leading: const Icon(Icons.assignment_outlined),
+                        title: const Text('Mi plan'),
+                        trailing: const Icon(Icons.chevron_right),
+                        onTap: () => Navigator.of(context).push(
+                          MaterialPageRoute(
+                            builder: (_) => const MiPlanScreen(),
+                          ),
+                        ),
+                      ),
                     ListTile(
                       leading: const Icon(Icons.notifications_outlined),
                       title: const Text('Mis notificaciones'),

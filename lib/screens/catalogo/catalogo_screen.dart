@@ -1,3 +1,5 @@
+import '../../core/session/contexto_sesion.dart';
+import 'preferencias_recomendaciones_sheet.dart';
 import 'filtros_catalogo_sheet.dart';
 
 import 'package:flutter/material.dart';
@@ -17,7 +19,6 @@ import 'producto_detalle_screen.dart';
 
 class CatalogoScreen extends StatefulWidget {
   const CatalogoScreen({super.key});
-
   @override
   State<CatalogoScreen> createState() => _CatalogoScreenState();
 }
@@ -28,10 +29,38 @@ class _CatalogoScreenState extends State<CatalogoScreen> {
   List<RecomendacionPrendaItem> _recomendacionesParaTi = [];
   bool _cargandoParaTi = false;
   String? _errorParaTi;
+  int _solicitudParaTi = 0;
+  bool _personalizacion = true;
+  int _generacion = ContextoSesion.instance.generacion;
+  void _cambioSesion() {
+    if (_generacion == ContextoSesion.instance.generacion) return;
+    _generacion = ContextoSesion.instance.generacion;
+    if (mounted) {
+      setState(() {
+        _recomendacionesParaTi = [];
+        _modoParaTi = false;
+        _errorParaTi = null;
+        _cargandoParaTi = false;
+        _personalizacion = true;
+      });
+    }
+  }
+
+  Future<void> _preferencias() async {
+    final r = await showModalBottomSheet<bool>(
+      context: context,
+      isScrollControlled: true,
+      builder: (_) => PreferenciasRecomendacionesSheet(
+        categorias: context.read<CatalogoProvider>().categorias,
+      ),
+    );
+    if (mounted && r == true) await _cargarRecomendacionesParaTi();
+  }
 
   @override
   void initState() {
     super.initState();
+    ContextoSesion.instance.addListener(_cambioSesion);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       final catalogo = context.read<CatalogoProvider>();
       catalogo.cargarPrendas();
@@ -46,29 +75,39 @@ class _CatalogoScreenState extends State<CatalogoScreen> {
           .push<bool>(MaterialPageRoute(builder: (_) => const LoginScreen()));
       if (logueado != true || !mounted) return;
     }
-
     setState(() {
       _modoParaTi = true;
       _cargandoParaTi = true;
       _errorParaTi = null;
     });
-
+    final gen = _generacion;
+    final solicitud = ++_solicitudParaTi;
     try {
+      final p = await RecomendacionService.leerPreferencias();
       final items = await RecomendacionService.obtenerParaMi();
-      if (mounted) setState(() => _recomendacionesParaTi = items);
+      if (mounted && gen == _generacion && solicitud == _solicitudParaTi) {
+        setState(() {
+          _personalizacion = p.usarHistorial;
+          _recomendacionesParaTi = items;
+        });
+      }
     } catch (e) {
-      if (mounted) {
+      if (mounted && gen == _generacion && solicitud == _solicitudParaTi) {
         setState(
-          () => _errorParaTi = 'No se pudieron cargar recomendaciones: $e',
+          () => _errorParaTi =
+              'No se pudieron cargar las sugerencias. Reintenta la consulta.',
         );
       }
     } finally {
-      if (mounted) setState(() => _cargandoParaTi = false);
+      if (mounted && gen == _generacion && solicitud == _solicitudParaTi) {
+        setState(() => _cargandoParaTi = false);
+      }
     }
   }
 
   @override
   void dispose() {
+    ContextoSesion.instance.removeListener(_cambioSesion);
     _searchCtrl.dispose();
     super.dispose();
   }
@@ -76,7 +115,6 @@ class _CatalogoScreenState extends State<CatalogoScreen> {
   @override
   Widget build(BuildContext context) {
     final catalogo = context.watch<CatalogoProvider>();
-
     return Scaffold(
       appBar: AppBar(
         title: const Text(
@@ -89,6 +127,12 @@ class _CatalogoScreenState extends State<CatalogoScreen> {
           ),
         ),
         actions: [
+          if (_modoParaTi)
+            IconButton(
+              tooltip: 'Preferencias de recomendaciones',
+              onPressed: _preferencias,
+              icon: const Icon(Icons.tune),
+            ),
           Consumer<FavoritosProvider>(
             builder: (context, fav, _) {
               return Stack(
@@ -175,7 +219,6 @@ class _CatalogoScreenState extends State<CatalogoScreen> {
                 textInputAction: TextInputAction.search,
               ),
             ),
-
             // 1. Selector Horizontal de Categorías
             SingleChildScrollView(
               scrollDirection: Axis.horizontal,
@@ -225,7 +268,6 @@ class _CatalogoScreenState extends State<CatalogoScreen> {
                       ),
                     ),
                   ),
-
                   // Opción por defecto: "Todas las prendas"
                   Padding(
                     padding: const EdgeInsets.only(right: 8),
@@ -272,14 +314,12 @@ class _CatalogoScreenState extends State<CatalogoScreen> {
                       ),
                     ),
                   ),
-
                   // Categorías dinámicas cargadas del backend
                   ...catalogo.categorias.map((cat) {
                     final selected = catalogo.filtroCategoriaId == cat.id;
                     final nombreFormateado = cat.nombre.isNotEmpty
                         ? '${cat.nombre[0].toUpperCase()}${cat.nombre.substring(1)}'
                         : cat.nombre;
-
                     return Padding(
                       padding: const EdgeInsets.only(right: 8),
                       child: ChoiceChip(
@@ -323,7 +363,6 @@ class _CatalogoScreenState extends State<CatalogoScreen> {
                 ],
               ),
             ),
-
             // 2. Filtros Secundarios: Sucursales y Stock
             SingleChildScrollView(
               scrollDirection: Axis.horizontal,
@@ -465,9 +504,7 @@ class _CatalogoScreenState extends State<CatalogoScreen> {
                 ],
               ),
             ),
-
             const SizedBox(height: 6),
-
             // Contenido: Lista o Estados
             Expanded(
               child: RefreshIndicator(
@@ -527,23 +564,28 @@ class _CatalogoScreenState extends State<CatalogoScreen> {
             CircularProgressIndicator(color: Color(0xFFD97706)),
             SizedBox(height: 16),
             Text(
-              'Generando recomendaciones con IA...',
+              'Buscando sugerencias disponibles…',
               style: TextStyle(color: AppColors.textSecondary),
             ),
           ],
         ),
       );
     }
-
     if (_recomendacionesParaTi.isEmpty) {
       return EmptyState(
         icon: _errorParaTi == null
             ? Icons.auto_awesome
             : Icons.wifi_off_outlined,
         title: _errorParaTi == null
-            ? 'Aún no tenemos recomendaciones personalizadas'
+            ? (_personalizacion
+                  ? 'Aún no tenemos recomendaciones personalizadas'
+                  : 'La personalización está desactivada; tus favoritos se conservan')
             : 'No se pudieron cargar tus recomendaciones',
-        subtitle: _errorParaTi ?? 'Explora prendas, agrégalas a favoritos o realiza una compra para que nuestra IA conozca tu estilo.',
+        subtitle:
+            _errorParaTi ??
+            (_personalizacion
+                ? 'Explora el catálogo o guarda favoritos para encontrar prendas afines.'
+                : 'La personalización está desactivada. Tus favoritos se conservan.'),
         actionText: _errorParaTi == null
             ? 'Ver catálogo completo'
             : 'Reintentar',
@@ -554,7 +596,6 @@ class _CatalogoScreenState extends State<CatalogoScreen> {
             : _cargarRecomendacionesParaTi,
       );
     }
-
     return Column(
       children: [
         Container(
@@ -571,7 +612,7 @@ class _CatalogoScreenState extends State<CatalogoScreen> {
               SizedBox(width: 8),
               Expanded(
                 child: Text(
-                  'Sugerencias inteligentes basadas en tu perfil y prendas favoritas.',
+                  'El motivo de cada tarjeta distingue sugerencias iniciales y personalizadas.',
                   style: TextStyle(
                     fontSize: 12,
                     color: Color(0xFF92400E),
@@ -621,7 +662,6 @@ class _CatalogoScreenState extends State<CatalogoScreen> {
     if (catalogo.cargando && catalogo.prendas.isEmpty) {
       return const Center(child: CircularProgressIndicator());
     }
-
     if (catalogo.error != null && catalogo.prendas.isEmpty) {
       return EmptyState(
         icon: Icons.wifi_off_outlined,
@@ -631,7 +671,6 @@ class _CatalogoScreenState extends State<CatalogoScreen> {
         onAction: () => catalogo.cargarPrendas(),
       );
     }
-
     if (catalogo.prendas.isEmpty) {
       return EmptyState(
         icon: Icons.search_off_outlined,
@@ -644,7 +683,6 @@ class _CatalogoScreenState extends State<CatalogoScreen> {
         },
       );
     }
-
     return GridView.builder(
       padding: const EdgeInsets.all(16),
       gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(

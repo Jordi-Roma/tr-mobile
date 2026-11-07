@@ -6,12 +6,32 @@ import '../models/recomendacion_models.dart';
 class RecomendacionService {
   RecomendacionService._();
 
+  static Future<PreferenciasIA> leerPreferencias() async =>
+      PreferenciasIA.fromJson(
+        await ApiClient.get(
+          '${ApiConstants.baseUrl}/recomendaciones/preferencias',
+        ) as Map<String, dynamic>,
+      );
+  static Future<PreferenciasIA> guardarPreferencias(PreferenciasIA p) async =>
+      PreferenciasIA.fromJson(
+        await ApiClient.put(
+          '${ApiConstants.baseUrl}/recomendaciones/preferencias',
+          body: p.toJson(),
+        ) as Map<String, dynamic>,
+      );
+
   /// Obtiene prendas recomendadas personalizadas para el cliente logueado.
-  static Future<List<RecomendacionPrendaItem>> obtenerParaMi({int limite = 8}) async {
+  static Future<List<RecomendacionPrendaItem>> obtenerParaMi({
+    int limite = 8,
+  }) async {
     final url = '${ApiConstants.recomendacionesParaMi}?limite=$limite';
     final res = await ApiClient.get(url);
     if (res is List) {
-      return res.map((e) => RecomendacionPrendaItem.fromJson(e as Map<String, dynamic>)).toList();
+      return res
+          .map(
+            (e) => RecomendacionPrendaItem.fromJson(e as Map<String, dynamic>),
+          )
+          .toList();
     }
     return [];
   }
@@ -31,7 +51,11 @@ class RecomendacionService {
     final url = '${ApiConstants.recomendacionesProducto(productoId)}?$query';
     final res = await ApiClient.get(url, withAuth: false);
     if (res is List) {
-      return res.map((e) => RecomendacionPrendaItem.fromJson(e as Map<String, dynamic>)).toList();
+      return res
+          .map(
+            (e) => RecomendacionPrendaItem.fromJson(e as Map<String, dynamic>),
+          )
+          .toList();
     }
     return [];
   }
@@ -40,30 +64,40 @@ class RecomendacionService {
   static Future<List<CatalogoPrendaItem>> listarFavoritos() async {
     final res = await ApiClient.get(ApiConstants.recomendacionesFavoritos);
     if (res is List) {
-      return res.map((e) => CatalogoPrendaItem.fromJson(e as Map<String, dynamic>)).toList();
+      return res
+          .map((e) => CatalogoPrendaItem.fromJson(e as Map<String, dynamic>))
+          .toList();
     }
     return [];
   }
 
   /// Agrega una prenda a favoritos del usuario.
-  static Future<List<CatalogoPrendaItem>> agregarFavorito(int productoId) async {
+  static Future<List<CatalogoPrendaItem>> agregarFavorito(
+    int productoId,
+  ) async {
     final res = await ApiClient.put(
       ApiConstants.recomendacionesFavoritoDetalle(productoId),
       body: {},
     );
     if (res is List) {
-      return res.map((e) => CatalogoPrendaItem.fromJson(e as Map<String, dynamic>)).toList();
+      return res
+          .map((e) => CatalogoPrendaItem.fromJson(e as Map<String, dynamic>))
+          .toList();
     }
     return [];
   }
 
   /// Elimina una prenda de favoritos del usuario.
-  static Future<List<CatalogoPrendaItem>> eliminarFavorito(int productoId) async {
+  static Future<List<CatalogoPrendaItem>> eliminarFavorito(
+    int productoId,
+  ) async {
     final res = await ApiClient.delete(
       ApiConstants.recomendacionesFavoritoDetalle(productoId),
     );
     if (res is List) {
-      return res.map((e) => CatalogoPrendaItem.fromJson(e as Map<String, dynamic>)).toList();
+      return res
+          .map((e) => CatalogoPrendaItem.fromJson(e as Map<String, dynamic>))
+          .toList();
     }
     return [];
   }

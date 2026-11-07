@@ -1,4 +1,5 @@
 import 'dart:typed_data';
+
 import '../core/constants/api_constants.dart';
 import '../core/network/api_client.dart';
 import '../models/reporte_models.dart';
@@ -38,10 +39,13 @@ class ReporteService {
   }
 
   /// Interpreta un texto o dictado por voz para extraer filtros de reporte automáticamente.
-  static Future<ReporteInterpretacionResultado> interpretar(String texto) async {
+  static Future<ReporteInterpretacionResultado> interpretar(
+    String texto, {
+    String origen = 'TEXTO',
+  }) async {
     final res = await ApiClient.post(
       ApiConstants.reportesInterpretar,
-      body: {'texto': texto},
+      body: {'texto': texto, 'origen': origen},
     );
     return ReporteInterpretacionResultado.fromJson(res as Map<String, dynamic>);
   }
@@ -58,7 +62,9 @@ class ReporteService {
   }
 
   /// Crea una nueva programación automática de reporte.
-  static Future<Map<String, dynamic>> crearProgramado(Map<String, dynamic> datos) async {
+  static Future<Map<String, dynamic>> crearProgramado(
+    Map<String, dynamic> datos,
+  ) async {
     final res = await ApiClient.post(
       ApiConstants.reportesProgramados,
       body: datos,
@@ -67,7 +73,10 @@ class ReporteService {
   }
 
   /// Activa o pausa una programación automática.
-  static Future<Map<String, dynamic>> actualizarEstadoProgramado(int id, bool activo) async {
+  static Future<Map<String, dynamic>> actualizarEstadoProgramado(
+    int id,
+    bool activo,
+  ) async {
     final res = await ApiClient.patch(
       ApiConstants.reporteProgramadoEstado(id),
       body: {'activo': activo},
@@ -83,12 +92,43 @@ class ReporteService {
     return res is Map<String, dynamic> ? res : {};
   }
 
-  /// Ejecuta inmediatamente un reporte programado y simula envío.
+  /// Ejecuta un envío mediante el transporte configurado; consultar historial ante resultado incierto.
   static Future<Map<String, dynamic>> ejecutarProgramado(int id) async {
     final res = await ApiClient.post(
       ApiConstants.reporteProgramadoEjecutar(id),
     );
     return res is Map<String, dynamic> ? res : {};
   }
-}
 
+  static Future<ReporteResultado> detalle(
+    ReporteFiltros filtros, {
+    int pagina = 1,
+    int tamano = 20,
+  }) async => ReporteResultado.fromJson(
+    await ApiClient.post(
+      '${ApiConstants.baseUrl}/reportes/detalle',
+      body: {...filtros.toJson(), 'pagina': pagina, 'tamano': tamano},
+    ) as Map<String, dynamic>,
+  );
+  static Future<Map<String, dynamic>> dashboard(
+    Map<String, dynamic> filtros,
+  ) async => await ApiClient.post(
+    '${ApiConstants.baseUrl}/reportes/dashboard',
+    body: filtros,
+  ) as Map<String, dynamic>;
+  static Future<void> editarProgramado(
+    int id,
+    int revision,
+    Map<String, dynamic> cambios,
+  ) async {
+    await ApiClient.patch(
+      '${ApiConstants.reportesProgramados}/$id',
+      body: {'revision': revision, 'cambios': cambios},
+    );
+  }
+
+  static Future<List<Map<String, dynamic>>> ejecuciones(int id) async =>
+      (await ApiClient.get(
+        '${ApiConstants.reportesProgramados}/$id/ejecuciones',
+      ) as List).cast<Map<String, dynamic>>();
+}

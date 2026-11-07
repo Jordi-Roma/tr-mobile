@@ -9,7 +9,8 @@ import '../../providers/auth_provider.dart';
 import '../../services/devolucion_service.dart';
 
 class DevolucionesScreen extends StatefulWidget {
-  const DevolucionesScreen({super.key});
+  const DevolucionesScreen({super.key,this.seleccionInicial});
+  final int? seleccionInicial;
 
   @override
   State<DevolucionesScreen> createState() => _DevolucionesScreenState();
@@ -42,6 +43,7 @@ class _DevolucionesScreenState extends State<DevolucionesScreen>
     'CANCELADA',
   ];
 
+  bool _seleccionAplicada=false;
   int _generacion = ContextoSesion.instance.generacion;
 
   void _cambioSesion() {
@@ -150,6 +152,7 @@ class _DevolucionesScreenState extends State<DevolucionesScreen>
           _cargando = false;
         });
       }
+      if(!_seleccionAplicada&&widget.seleccionInicial!=null){_seleccionAplicada=true;final d=_devolucionesCliente.where((d)=>d.id==widget.seleccionInicial).firstOrNull;if(d!=null)WidgetsBinding.instance.addPostFrameCallback((_){if(mounted&&generacion==_generacion)_verDetalle(d,esGestion:false);});}
     } catch (error) {
       if (!mounted || generacion != _generacion) return;
       setState(() {

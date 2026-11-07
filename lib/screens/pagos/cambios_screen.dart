@@ -11,7 +11,8 @@ import '../../services/devolucion_service.dart';
 import 'devoluciones_screen.dart';
 
 class CambiosScreen extends StatefulWidget {
-  const CambiosScreen({super.key});
+  const CambiosScreen({super.key, this.seleccionInicial});
+  final int? seleccionInicial;
   @override
   State<CambiosScreen> createState() => _CambiosScreenState();
 }
@@ -31,6 +32,7 @@ class _CambiosScreenState extends State<CambiosScreen> {
   int? _opcion;
   Map<String, dynamic>? _politica;
   CambioPrenda? _actual;
+  bool _seleccionAplicada = false;
   @override
   void initState() {
     super.initState();
@@ -78,7 +80,10 @@ class _CambiosScreenState extends State<CambiosScreen> {
         _lista = lista;
         _ventas = ventas;
         _politica = politica;
-        final id = _actual?.id;
+        final id =
+            _actual?.id ??
+            (!_seleccionAplicada ? widget.seleccionInicial : null);
+        _seleccionAplicada = true;
         _actual = null;
         for (final c in lista) {
           if (c.id == id) _actual = c;

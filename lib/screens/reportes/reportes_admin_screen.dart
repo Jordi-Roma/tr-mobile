@@ -1,3 +1,11 @@
+import 'package:provider/provider.dart';
+
+import '../../providers/auth_provider.dart';
+import '../../providers/plan_provider.dart';
+import '../saas/saas_widgets.dart';
+import 'dashboard_comercial_tab.dart';
+import 'programados_reportes_tab.dart';
+
 import 'dart:convert';
 import 'dart:typed_data';
 
@@ -11,7 +19,7 @@ import '../../services/file_download_service.dart';
 import '../../services/reporte_service.dart';
 import '../../services/voz_service.dart';
 
-/// Pantalla de Reportes y Dashboard para el Administrador (CU21).
+/// Reportes y dashboard comercial con alcance de administrador o encargado (CU22).
 class ReportesAdminScreen extends StatefulWidget {
   const ReportesAdminScreen({super.key});
 
@@ -20,7 +28,7 @@ class ReportesAdminScreen extends StatefulWidget {
 }
 
 class _ReportesAdminScreenState extends State<ReportesAdminScreen>
-    with SingleTickerProviderStateMixin {
+    with SingleTickerProviderStateMixin, PantallaSesion {
   // ── Estado del catálogo ──────────────────────────────────────────────
   ReporteCatalogo? _catalogo;
   bool _cargandoCatalogo = false;
@@ -48,12 +56,12 @@ class _ReportesAdminScreenState extends State<ReportesAdminScreen>
   // ── Exportar ─────────────────────────────────────────────────────────
   bool _exportando = false;
 
-  // ── Reportes Programados ──────────────────────────────────────────────
-  List<ReporteProgramadoItem> _programados = [];
-  bool _cargandoProgramados = false;
-  String? _errorProgramados;
-  int? _ejecutandoId;
-
+  ReporteFiltros? _filtrosResultado;
+  String? _tipoVenta;
+  int _revisionConsulta = 0;
+  bool get _esAdmin => context.read<AuthProvider>().esAdmin;
+  bool _capacidad(String clave) =>
+      context.read<PlanProvider>().capacidades?.habilita(clave) == true;
   // ── Tab controller ───────────────────────────────────────────────────
   late TabController _tabController;
 
@@ -62,9 +70,8 @@ class _ReportesAdminScreenState extends State<ReportesAdminScreen>
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 3, vsync: this);
+    _tabController = TabController(length: _esAdmin ? 4 : 3, vsync: this);
     _cargarCatalogo();
-    _cargarProgramados();
   }
 
   @override
@@ -83,68 +90,91 @@ class _ReportesAdminScreenState extends State<ReportesAdminScreen>
     });
     try {
       final catalogo = await ReporteService.obtenerCatalogo();
-      if (mounted) {
-        setState(() => _catalogo = catalogo);
+      if (mounted && vigente) {
+        setState(() {
+          _catalogo = catalogo;
+          if (!_esAdmin) _sucursalId = catalogo.sucursales.firstOrNull?.id;
+        });
         // Generar automáticamente el reporte inicial con los filtros por defecto
         _generarReporte(irAResultados: false);
       }
     } on ApiException catch (e) {
-      if (mounted) setState(() => _errorCatalogo = e.message);
+      if (mounted && vigente) setState(() => _errorCatalogo = e.message);
     } catch (_) {
-      if (mounted) {
+      if (mounted && vigente) {
         setState(
           () => _errorCatalogo = 'Error al cargar el catálogo de reportes.',
         );
       }
     } finally {
-      if (mounted) setState(() => _cargandoCatalogo = false);
+      if (mounted && vigente) setState(() => _cargandoCatalogo = false);
     }
   }
 
   // ── Generar reporte ──────────────────────────────────────────────────
 
-  Future<void> _generarReporte({bool irAResultados = true}) async {
+  Future<void> _generarReporte({
+    bool irAResultados = true,
+    int pagina = 1,
+    bool reutilizar = false,
+  }) async {
+    if (_generando) return;
+    final revision = ++_revisionConsulta;
     setState(() {
       _generando = true;
       _errorReporte = null;
-      _resultado = null;
+      if (!reutilizar) _resultado = null;
     });
 
     try {
-      final filtros = _buildFiltros();
-      final resultado = await ReporteService.generar(filtros);
-      if (mounted) {
-        setState(() => _resultado = resultado);
+      final filtros = reutilizar ? _filtrosResultado! : _buildFiltros();
+      final resultado = await ReporteService.detalle(filtros, pagina: pagina);
+      if (mounted && vigente) {
+        if (revision != _revisionConsulta) return;
+        setState(() {
+          _resultado = resultado;
+          _filtrosResultado = filtros;
+        });
         if (irAResultados) {
           _tabController.animateTo(1);
         }
       }
     } on ApiException catch (e) {
-      if (mounted) setState(() => _errorReporte = e.message);
+      if (mounted && vigente) setState(() => _errorReporte = e.message);
     } catch (_) {
-      if (mounted) {
+      if (mounted && vigente) {
         setState(() => _errorReporte = 'Error al generar el reporte.');
       }
     } finally {
-      if (mounted) setState(() => _generando = false);
+      if (mounted && vigente) setState(() => _generando = false);
     }
   }
 
   // ── Exportar ─────────────────────────────────────────────────────────
 
   Future<void> _exportar(String formato) async {
-    if (_resultado == null) return;
+    if (_resultado == null ||
+        _exportando ||
+        _resultado!.totalFilas > 5000 ||
+        (formato != 'html' &&
+            !_capacidad(
+              formato == 'pdf' ? 'reportes_pdf' : 'reportes_excel',
+            ))) {
+      return;
+    }
 
     setState(() => _exportando = true);
 
     try {
-      final filtros = _buildFiltros();
+      final filtros = _filtrosResultado!;
       final Uint8List bytes;
       final String ext;
       final String mimeType;
 
       if (formato == 'html') {
-        bytes = Uint8List.fromList(utf8.encode(_buildHtmlReporte(_resultado!)));
+        final completo = await ReporteService.generar(filtros);
+        if (!mounted || !vigente) return;
+        bytes = Uint8List.fromList(utf8.encode(_buildHtmlReporte(completo)));
         ext = 'html';
         mimeType = 'text/html; charset=utf-8';
       } else if (formato == 'pdf') {
@@ -158,15 +188,16 @@ class _ReportesAdminScreenState extends State<ReportesAdminScreen>
             'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
       }
 
+      if (!mounted || !vigente) return;
       final fname =
-          '${_tipoSeleccionado.valor.toLowerCase()}_${DateFormat(_dateFormat).format(_fechaDesde)}_${DateFormat(_dateFormat).format(_fechaHasta)}.$ext';
+          '${filtros.tipo.valor.toLowerCase()}_${filtros.fechaDesde}_${filtros.fechaHasta}.$ext';
       final ubicacion = await FileDownloadService.guardarYMostrarArchivo(
         bytes: bytes,
         nombreArchivo: fname,
         mimeType: mimeType,
       );
 
-      if (!mounted) return;
+      if (!mounted || !vigente) return;
 
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
@@ -180,13 +211,13 @@ class _ReportesAdminScreenState extends State<ReportesAdminScreen>
         ),
       );
     } on ApiException catch (e) {
-      if (mounted) {
+      if (mounted && vigente) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text(e.message), backgroundColor: AppColors.danger),
         );
       }
     } catch (e) {
-      if (mounted) {
+      if (mounted && vigente) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text('Error al exportar el reporte.'),
@@ -195,7 +226,7 @@ class _ReportesAdminScreenState extends State<ReportesAdminScreen>
         );
       }
     } finally {
-      if (mounted) setState(() => _exportando = false);
+      if (mounted && vigente) setState(() => _exportando = false);
     }
   }
 
@@ -349,6 +380,7 @@ class _ReportesAdminScreenState extends State<ReportesAdminScreen>
 
   ReporteFiltros _buildFiltros() => ReporteFiltros(
     tipo: _tipoSeleccionado,
+    tipoVenta: _tipoVenta,
     fechaDesde: DateFormat(_dateFormat).format(_fechaDesde),
     fechaHasta: DateFormat(_dateFormat).format(_fechaHasta),
     sucursalId: _sucursalId,
@@ -387,528 +419,9 @@ class _ReportesAdminScreenState extends State<ReportesAdminScreen>
 
   // ── Operaciones de Reportes Programados ───────────────────────────────
 
-  Future<void> _cargarProgramados() async {
-    setState(() {
-      _cargandoProgramados = true;
-      _errorProgramados = null;
-    });
-    try {
-      final list = await ReporteService.listarProgramados();
-      if (mounted) setState(() => _programados = list);
-    } on ApiException catch (e) {
-      if (mounted) setState(() => _errorProgramados = e.message);
-    } catch (e) {
-      if (mounted) {
-        setState(
-          () => _errorProgramados = 'Error al cargar reportes programados: $e',
-        );
-      }
-    } finally {
-      if (mounted) setState(() => _cargandoProgramados = false);
-    }
-  }
-
-  Future<void> _cambiarEstadoProgramado(
-    ReporteProgramadoItem item,
-    bool activo,
-  ) async {
-    try {
-      await ReporteService.actualizarEstadoProgramado(item.id, activo);
-      if (mounted) {
-        _cargarProgramados();
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(
-              activo
-                  ? 'Reporte "${item.titulo}" activado.'
-                  : 'Reporte "${item.titulo}" pausado.',
-            ),
-            backgroundColor: activo ? AppColors.success : AppColors.warning,
-            duration: const Duration(seconds: 2),
-          ),
-        );
-      }
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Error al cambiar estado: $e'),
-            backgroundColor: AppColors.danger,
-          ),
-        );
-      }
-    }
-  }
-
-  Future<void> _ejecutarProgramado(ReporteProgramadoItem item) async {
-    setState(() => _ejecutandoId = item.id);
-    try {
-      final res = await ReporteService.ejecutarProgramado(item.id);
-      if (mounted) {
-        _cargarProgramados();
-        final msg =
-            res['mensaje']?.toString() ??
-            'Reporte ejecutado y enviado a ${item.destinatarioEmail}';
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('✅ $msg'),
-            backgroundColor: AppColors.success,
-            duration: const Duration(seconds: 4),
-          ),
-        );
-      }
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Error al ejecutar reporte: $e'),
-            backgroundColor: AppColors.danger,
-          ),
-        );
-      }
-    } finally {
-      if (mounted) setState(() => _ejecutandoId = null);
-    }
-  }
-
-  Future<void> _eliminarProgramado(ReporteProgramadoItem item) async {
-    final confirmar = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('¿Eliminar programación?'),
-        content: Text(
-          'Se eliminará la programación automática del reporte "${item.titulo}".',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, false),
-            child: const Text('Cancelar'),
-          ),
-          ElevatedButton(
-            style: ElevatedButton.styleFrom(backgroundColor: AppColors.danger),
-            onPressed: () => Navigator.pop(ctx, true),
-            child: const Text(
-              'Eliminar',
-              style: TextStyle(color: Colors.white),
-            ),
-          ),
-        ],
-      ),
-    );
-
-    if (confirmar == true) {
-      try {
-        await ReporteService.eliminarProgramado(item.id);
-        if (mounted) {
-          _cargarProgramados();
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Programación eliminada.'),
-              backgroundColor: AppColors.textPrimary,
-              duration: Duration(seconds: 2),
-            ),
-          );
-        }
-      } catch (e) {
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('Error al eliminar: $e'),
-              backgroundColor: AppColors.danger,
-            ),
-          );
-        }
-      }
-    }
-  }
-
-  Future<void> _mostrarModalNuevoProgramado() async {
-    final tituloCtrl = TextEditingController();
-    final emailCtrl = TextEditingController(text: 'admin@tiendaropa.com');
-    final horaCtrl = TextEditingController(text: '08:00');
-    TipoReporte tipo = TipoReporte.ventas;
-    String frecuencia = 'DIARIA';
-    String formato = 'PDF';
-    String diaSemanal = 'LUNES';
-    int? sucursalId;
-    bool soloBajoStock = false;
-    bool guardando = false;
-    String? errorModal;
-
-    await showDialog(
-      context: context,
-      barrierDismissible: false,
-      builder: (ctx) {
-        return StatefulBuilder(
-          builder: (dialogCtx, setDialogState) {
-            final sucursales = _catalogo?.sucursales ?? [];
-            return AlertDialog(
-              title: const Row(
-                children: [
-                  Icon(Icons.alarm_add, color: AppColors.primary),
-                  SizedBox(width: 8),
-                  Text(
-                    'Programar Reporte',
-                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-                  ),
-                ],
-              ),
-              content: SizedBox(
-                width: double.maxFinite,
-                child: SingleChildScrollView(
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      // Título
-                      TextField(
-                        controller: tituloCtrl,
-                        decoration: const InputDecoration(
-                          labelText: 'Título del reporte *',
-                          hintText: 'Ej. Reporte diario de ventas',
-                          border: OutlineInputBorder(),
-                          isDense: true,
-                        ),
-                      ),
-                      const SizedBox(height: 14),
-
-                      // Tipo de Reporte
-                      DropdownButtonFormField<TipoReporte>(
-                        initialValue: tipo,
-                        decoration: const InputDecoration(
-                          labelText: 'Tipo de reporte',
-                          border: OutlineInputBorder(),
-                          isDense: true,
-                        ),
-                        items: TipoReporte.values
-                            .map(
-                              (t) => DropdownMenuItem(
-                                value: t,
-                                child: Text(
-                                  t.etiqueta,
-                                  style: const TextStyle(fontSize: 13),
-                                ),
-                              ),
-                            )
-                            .toList(),
-                        onChanged: (val) {
-                          if (val != null) setDialogState(() => tipo = val);
-                        },
-                      ),
-                      const SizedBox(height: 14),
-
-                      // Frecuencia
-                      DropdownButtonFormField<String>(
-                        initialValue: frecuencia,
-                        decoration: const InputDecoration(
-                          labelText: 'Frecuencia de envío',
-                          border: OutlineInputBorder(),
-                          isDense: true,
-                        ),
-                        items: const [
-                          DropdownMenuItem(
-                            value: 'DIARIA',
-                            child: Text('Diaria'),
-                          ),
-                          DropdownMenuItem(
-                            value: 'SEMANAL',
-                            child: Text('Semanal'),
-                          ),
-                          DropdownMenuItem(
-                            value: 'MENSUAL',
-                            child: Text('Mensual'),
-                          ),
-                        ],
-                        onChanged: (val) {
-                          if (val != null) {
-                            setDialogState(() => frecuencia = val);
-                          }
-                        },
-                      ),
-                      const SizedBox(height: 14),
-
-                      // Día si es semanal
-                      if (frecuencia == 'SEMANAL') ...[
-                        DropdownButtonFormField<String>(
-                          initialValue: diaSemanal,
-                          decoration: const InputDecoration(
-                            labelText: 'Día de la semana',
-                            border: OutlineInputBorder(),
-                            isDense: true,
-                          ),
-                          items: const [
-                            DropdownMenuItem(
-                              value: 'LUNES',
-                              child: Text('Lunes'),
-                            ),
-                            DropdownMenuItem(
-                              value: 'MARTES',
-                              child: Text('Martes'),
-                            ),
-                            DropdownMenuItem(
-                              value: 'MIERCOLES',
-                              child: Text('Miércoles'),
-                            ),
-                            DropdownMenuItem(
-                              value: 'JUEVES',
-                              child: Text('Jueves'),
-                            ),
-                            DropdownMenuItem(
-                              value: 'VIERNES',
-                              child: Text('Viernes'),
-                            ),
-                            DropdownMenuItem(
-                              value: 'SABADO',
-                              child: Text('Sábado'),
-                            ),
-                            DropdownMenuItem(
-                              value: 'DOMINGO',
-                              child: Text('Domingo'),
-                            ),
-                          ],
-                          onChanged: (val) {
-                            if (val != null) {
-                              setDialogState(() => diaSemanal = val);
-                            }
-                          },
-                        ),
-                        const SizedBox(height: 14),
-                      ],
-
-                      // Hora
-                      TextField(
-                        controller: horaCtrl,
-                        decoration: const InputDecoration(
-                          labelText: 'Hora de ejecución (HH:mm) *',
-                          hintText: '08:00',
-                          border: OutlineInputBorder(),
-                          isDense: true,
-                          prefixIcon: Icon(Icons.access_time, size: 18),
-                        ),
-                      ),
-                      const SizedBox(height: 14),
-
-                      // Formato
-                      Row(
-                        children: [
-                          const Text(
-                            'Formato: ',
-                            style: TextStyle(
-                              fontSize: 13,
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
-                          const SizedBox(width: 8),
-                          ChoiceChip(
-                            label: const Text('PDF'),
-                            selected: formato == 'PDF',
-                            selectedColor: AppColors.primary,
-                            labelStyle: TextStyle(
-                              color: formato == 'PDF'
-                                  ? Colors.white
-                                  : AppColors.textPrimary,
-                              fontSize: 12,
-                            ),
-                            onSelected: (_) =>
-                                setDialogState(() => formato = 'PDF'),
-                          ),
-                          const SizedBox(width: 8),
-                          ChoiceChip(
-                            label: const Text('EXCEL'),
-                            selected: formato == 'EXCEL',
-                            selectedColor: AppColors.success,
-                            labelStyle: TextStyle(
-                              color: formato == 'EXCEL'
-                                  ? Colors.white
-                                  : AppColors.textPrimary,
-                              fontSize: 12,
-                            ),
-                            onSelected: (_) =>
-                                setDialogState(() => formato = 'EXCEL'),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 14),
-
-                      // Email Destinatario
-                      TextField(
-                        controller: emailCtrl,
-                        keyboardType: TextInputType.emailAddress,
-                        decoration: const InputDecoration(
-                          labelText: 'Correo destinatario *',
-                          hintText: 'ejemplo@empresa.com',
-                          border: OutlineInputBorder(),
-                          isDense: true,
-                          prefixIcon: Icon(Icons.email_outlined, size: 18),
-                        ),
-                      ),
-                      const SizedBox(height: 14),
-
-                      // Sucursal
-                      if (sucursales.isNotEmpty) ...[
-                        DropdownButtonFormField<int?>(
-                          initialValue: sucursalId,
-                          decoration: const InputDecoration(
-                            labelText: 'Sucursal',
-                            border: OutlineInputBorder(),
-                            isDense: true,
-                          ),
-                          items: [
-                            const DropdownMenuItem<int?>(
-                              value: null,
-                              child: Text(
-                                'Todas las sucursales',
-                                style: TextStyle(fontSize: 13),
-                              ),
-                            ),
-                            ...sucursales.map(
-                              (s) => DropdownMenuItem<int?>(
-                                value: s.id,
-                                child: Text(
-                                  '${s.nombre} (${s.ciudad})',
-                                  style: const TextStyle(fontSize: 13),
-                                ),
-                              ),
-                            ),
-                          ],
-                          onChanged: (val) =>
-                              setDialogState(() => sucursalId = val),
-                        ),
-                        const SizedBox(height: 14),
-                      ],
-
-                      // Solo bajo stock
-                      if (tipo == TipoReporte.inventario)
-                        CheckboxListTile(
-                          contentPadding: EdgeInsets.zero,
-                          title: const Text(
-                            'Solo bajo stock',
-                            style: TextStyle(fontSize: 13),
-                          ),
-                          value: soloBajoStock,
-                          onChanged: (v) =>
-                              setDialogState(() => soloBajoStock = v ?? false),
-                          controlAffinity: ListTileControlAffinity.leading,
-                        ),
-
-                      if (errorModal != null) ...[
-                        const SizedBox(height: 8),
-                        Text(
-                          errorModal!,
-                          style: const TextStyle(
-                            color: AppColors.danger,
-                            fontSize: 12,
-                          ),
-                        ),
-                      ],
-                    ],
-                  ),
-                ),
-              ),
-              actions: [
-                TextButton(
-                  onPressed: guardando ? null : () => Navigator.pop(ctx),
-                  child: const Text('Cancelar'),
-                ),
-                ElevatedButton(
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: AppColors.primary,
-                  ),
-                  onPressed: guardando
-                      ? null
-                      : () async {
-                          final titulo = tituloCtrl.text.trim();
-                          final email = emailCtrl.text.trim();
-                          final hora = horaCtrl.text.trim();
-
-                          if (titulo.isEmpty) {
-                            setDialogState(
-                              () => errorModal =
-                                  'Ingresa un título para el reporte.',
-                            );
-                            return;
-                          }
-                          if (email.isEmpty || !email.contains('@')) {
-                            setDialogState(
-                              () => errorModal =
-                                  'Ingresa un correo electrónico válido.',
-                            );
-                            return;
-                          }
-                          if (hora.isEmpty) {
-                            setDialogState(
-                              () =>
-                                  errorModal = 'Ingresa la hora de ejecución.',
-                            );
-                            return;
-                          }
-
-                          setDialogState(() {
-                            guardando = true;
-                            errorModal = null;
-                          });
-
-                          try {
-                            await ReporteService.crearProgramado({
-                              'titulo': titulo,
-                              'tipo': tipo.valor,
-                              'frecuencia': frecuencia,
-                              'hora': hora,
-                              'dia': frecuencia == 'SEMANAL'
-                                  ? diaSemanal
-                                  : null,
-                              'formato': formato,
-                              'destinatario_email': email,
-                              'sucursal_id': sucursalId,
-                              'solo_bajo_stock': soloBajoStock,
-                              'activo': true,
-                            });
-                            if (!dialogCtx.mounted) return;
-                            Navigator.pop(ctx);
-                            _cargarProgramados();
-                            if (mounted) {
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                const SnackBar(
-                                  content: Text(
-                                    '✅ Reporte programado guardado y activado.',
-                                  ),
-                                  backgroundColor: AppColors.success,
-                                  duration: Duration(seconds: 3),
-                                ),
-                              );
-                            }
-                          } catch (e) {
-                            setDialogState(() {
-                              guardando = false;
-                              errorModal = 'Error al guardar: $e';
-                            });
-                          }
-                        },
-                  child: guardando
-                      ? const SizedBox(
-                          width: 16,
-                          height: 16,
-                          child: CircularProgressIndicator(
-                            strokeWidth: 2,
-                            color: Colors.white,
-                          ),
-                        )
-                      : const Text(
-                          'Guardar',
-                          style: TextStyle(color: Colors.white),
-                        ),
-                ),
-              ],
-            );
-          },
-        );
-      },
-    );
-  }
-
-  // ── Operaciones de Generación por Voz / IA ───────────────────────────
-
   Future<void> _abrirDialogoVoz() async {
+    if (!_capacidad('reportes_interpretacion')) return;
+    String origen = 'TEXTO';
     final textController = TextEditingController();
     bool interpretando = false;
     bool escuchando = false;
@@ -935,10 +448,13 @@ class _ReportesAdminScreenState extends State<ReportesAdminScreen>
                 errorVoz = null;
               });
               try {
-                final res = await ReporteService.interpretar(texto);
+                final res = await ReporteService.interpretar(
+                  texto,
+                  origen: origen,
+                );
                 if (!modalContext.mounted) return;
                 Navigator.pop(ctx);
-                if (mounted) {
+                if (mounted && vigente) {
                   _aplicarInterpretacion(res, texto);
                 }
               } catch (e) {
@@ -1055,7 +571,10 @@ class _ReportesAdminScreenState extends State<ReportesAdminScreen>
                               )
                             : null,
                       ),
-                      onChanged: (_) => setModalState(() {}),
+                      onChanged: (_) {
+                        origen = 'TEXTO';
+                        setModalState(() {});
+                      },
                     ),
                     const SizedBox(height: 10),
                     OutlinedButton.icon(
@@ -1076,6 +595,12 @@ class _ReportesAdminScreenState extends State<ReportesAdminScreen>
                       onPressed: interpretando
                           ? null
                           : () async {
+                              if (!_capacidad('reportes_voz')) {
+                                setModalState(
+                                  () => errorVoz = 'El dictado no está habilitado en tu plan.',
+                                );
+                                return;
+                              }
                               if (escuchando) {
                                 await VozService.detener();
                                 setModalState(() => escuchando = false);
@@ -1088,6 +613,8 @@ class _ReportesAdminScreenState extends State<ReportesAdminScreen>
                               });
                               await VozService.escuchar(
                                 onTexto: (texto, finalizado) {
+                                  if (!vigente || !modalContext.mounted) return;
+                                  origen = 'VOZ';
                                   if (!modalContext.mounted) return;
                                   setModalState(() {
                                     textController.text = texto;
@@ -1397,6 +924,10 @@ class _ReportesAdminScreenState extends State<ReportesAdminScreen>
 
   @override
   Widget build(BuildContext context) {
+    context.watch<PlanProvider>();
+    if (!context.watch<AuthProvider>().esAdminOEncargado) {
+      return const SizedBox.shrink();
+    }
     return Scaffold(
       backgroundColor: AppColors.background,
       appBar: AppBar(
@@ -1427,7 +958,6 @@ class _ReportesAdminScreenState extends State<ReportesAdminScreen>
             tooltip: 'Recargar',
             onPressed: () {
               if (_tabController.index == 2) {
-                _cargarProgramados();
               } else {
                 _generarReporte(irAResultados: false);
               }
@@ -1439,10 +969,19 @@ class _ReportesAdminScreenState extends State<ReportesAdminScreen>
           indicatorColor: AppColors.accent,
           labelColor: Colors.white,
           unselectedLabelColor: Colors.white60,
-          tabs: const [
-            Tab(icon: Icon(Icons.tune, size: 18), text: 'Filtros'),
-            Tab(icon: Icon(Icons.bar_chart, size: 18), text: 'Resultados'),
-            Tab(icon: Icon(Icons.schedule, size: 18), text: 'Automáticos'),
+          isScrollable: true,
+          tabs: [
+            const Tab(icon: Icon(Icons.tune, size: 18), text: 'Filtros'),
+            const Tab(
+              icon: Icon(Icons.bar_chart, size: 18),
+              text: 'Resultados',
+            ),
+            const Tab(icon: Icon(Icons.insights, size: 18), text: 'Dashboard'),
+            if (_esAdmin)
+              const Tab(
+                icon: Icon(Icons.schedule, size: 18),
+                text: 'Automáticos',
+              ),
           ],
         ),
       ),
@@ -1457,7 +996,15 @@ class _ReportesAdminScreenState extends State<ReportesAdminScreen>
               children: [
                 _buildFiltrosTab(),
                 _buildResultadosTab(),
-                _buildProgramadosTab(),
+                if (_catalogo != null)
+                  DashboardComercialTab(
+                    catalogo: _catalogo!,
+                    encargado: !_esAdmin,
+                  )
+                else
+                  const SizedBox.shrink(),
+                if (_esAdmin && _catalogo != null)
+                  ProgramadosReportesTab(catalogo: _catalogo!),
               ],
             ),
     );
@@ -1550,44 +1097,63 @@ class _ReportesAdminScreenState extends State<ReportesAdminScreen>
           ),
           const SizedBox(height: 20),
 
+          DropdownButtonFormField<String>(
+            initialValue: _tipoVenta,
+            decoration: const InputDecoration(labelText: 'Canal de venta'),
+            items: const [
+              DropdownMenuItem<String>(value: null, child: Text('Todos')),
+              DropdownMenuItem(value: 'PRESENCIAL', child: Text('Presencial')),
+              DropdownMenuItem(value: 'DIGITAL', child: Text('Digital')),
+            ],
+            onChanged: (v) => setState(() => _tipoVenta = v),
+          ),
           // Tipo de Reporte
           _SectionTitle(titulo: 'Tipo de Reporte'),
           const SizedBox(height: 10),
           Wrap(
             spacing: 8,
             runSpacing: 8,
-            children: TipoReporte.values.map((tipo) {
-              final seleccionado = _tipoSeleccionado == tipo;
-              return ChoiceChip(
-                label: Text(tipo.etiqueta),
-                selected: seleccionado,
-                onSelected: (_) => setState(() {
-                  _tipoSeleccionado = tipo;
-                  _estado = null;
-                  _metodoPago = null;
-                  _proveedorPago = null;
-                  _tipoEntrega = null;
-                  _rol = null;
-                  _activo = null;
-                  _resultado = null;
-                }),
-                selectedColor: AppColors.primary,
-                labelStyle: TextStyle(
-                  color: seleccionado ? Colors.white : AppColors.textPrimary,
-                  fontSize: 12,
-                  fontWeight: seleccionado
-                      ? FontWeight.w700
-                      : FontWeight.normal,
-                ),
-                backgroundColor: Colors.white,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(20),
-                  side: BorderSide(
-                    color: seleccionado ? AppColors.primary : AppColors.border,
-                  ),
-                ),
-              );
-            }).toList(),
+            children: TipoReporte.values
+                .where(
+                  (t) => _catalogo?.tipos.any((v) => v.id == t.valor) == true,
+                )
+                .map((tipo) {
+                  final seleccionado = _tipoSeleccionado == tipo;
+                  return ChoiceChip(
+                    label: Text(tipo.etiqueta),
+                    selected: seleccionado,
+                    onSelected: (_) => setState(() {
+                      _tipoSeleccionado = tipo;
+                      _estado = null;
+                      _metodoPago = null;
+                      _proveedorPago = null;
+                      _tipoEntrega = null;
+                      _rol = null;
+                      _activo = null;
+                      _resultado = null;
+                    }),
+                    selectedColor: AppColors.primary,
+                    labelStyle: TextStyle(
+                      color: seleccionado
+                          ? Colors.white
+                          : AppColors.textPrimary,
+                      fontSize: 12,
+                      fontWeight: seleccionado
+                          ? FontWeight.w700
+                          : FontWeight.normal,
+                    ),
+                    backgroundColor: Colors.white,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(20),
+                      side: BorderSide(
+                        color: seleccionado
+                            ? AppColors.primary
+                            : AppColors.border,
+                      ),
+                    ),
+                  );
+                })
+                .toList(),
           ),
           const SizedBox(height: 24),
 
@@ -1846,6 +1412,12 @@ class _ReportesAdminScreenState extends State<ReportesAdminScreen>
   // ── Tab de Resultados ─────────────────────────────────────────────────
 
   Widget _buildResultadosTab() {
+    if (_errorReporte != null && _resultado == null) {
+      return _ErrorView(
+        mensaje: _errorReporte!,
+        onReintentar: () => _generarReporte(),
+      );
+    }
     if (_generando) {
       return const Center(
         child: Column(
@@ -1980,7 +1552,7 @@ class _ReportesAdminScreenState extends State<ReportesAdminScreen>
                 const SizedBox(width: 8),
                 Expanded(
                   child: Text(
-                    '${_tipoSeleccionado.etiqueta} · ${DateFormat('d MMM', 'es').format(_fechaDesde)} al ${DateFormat('d MMM', 'es').format(_fechaHasta)}',
+                    '${r.titulo} · ${_filtrosResultado!.fechaDesde} al ${_filtrosResultado!.fechaHasta}',
                     style: const TextStyle(
                       fontSize: 12,
                       fontWeight: FontWeight.w600,
@@ -2007,6 +1579,7 @@ class _ReportesAdminScreenState extends State<ReportesAdminScreen>
           const SizedBox(height: 14),
 
           // Encabezado del reporte
+          if (_errorReporte != null) ErrorSaas(_errorReporte!),
           _ReporteHeader(resultado: r),
           const SizedBox(height: 16),
 
@@ -2024,16 +1597,64 @@ class _ReportesAdminScreenState extends State<ReportesAdminScreen>
 
           // Tabla de datos
           if (r.filas.isNotEmpty) ...[
-            _TablaReporte(columnas: r.columnas, filas: r.filas),
+            _TablaReporte(
+              key: ValueKey(r.pagina),
+              columnas: r.columnas,
+              filas: r.filas,
+            ),
+            Wrap(
+              spacing: 12,
+              crossAxisAlignment: WrapCrossAlignment.center,
+              children: [
+                OutlinedButton(
+                  onPressed: r.pagina > 1 && !_generando
+                      ? () => _generarReporte(
+                          pagina: r.pagina - 1,
+                          reutilizar: true,
+                        )
+                      : null,
+                  child: const Text('Página anterior'),
+                ),
+                Text(
+                  'Página ${r.pagina} de ${(r.totalFilas / r.tamano).ceil()} · ${r.totalFilas} registros',
+                ),
+                OutlinedButton(
+                  onPressed: r.pagina * r.tamano < r.totalFilas && !_generando
+                      ? () => _generarReporte(
+                          pagina: r.pagina + 1,
+                          reutilizar: true,
+                        )
+                      : null,
+                  child: const Text('Página siguiente'),
+                ),
+              ],
+            ),
             const SizedBox(height: 20),
           ],
 
           // Botones de exportación
+          if (r.resumen.isNotEmpty) ...[
+            Text(
+              'Totales del resultado completo: ${r.totalFilas} registros · ${r.resumen['unidades'] ?? 0} unidades',
+            ),
+            ...((r.resumen['importes_por_moneda'] as List?) ?? []).map((v) {
+              final m = v as Map;
+              return Text('Importe ${m['moneda']}: ${m['importe']}');
+            }),
+          ],
+          if (r.totalFilas > 5000)
+            const Text(
+              'El resultado supera 5.000 filas. Puedes recorrer las páginas; reduce el período para exportar sin truncar.',
+            ),
           _ExportButtons(
             exportando: _exportando,
-            onPdf: () => _exportar('pdf'),
-            onExcel: () => _exportar('excel'),
-            onHtml: () => _exportar('html'),
+            onPdf: _capacidad('reportes_pdf') && r.totalFilas <= 5000
+                ? () => _exportar('pdf')
+                : null,
+            onExcel: _capacidad('reportes_excel') && r.totalFilas <= 5000
+                ? () => _exportar('excel')
+                : null,
+            onHtml: r.totalFilas <= 5000 ? () => _exportar('html') : null,
           ),
           const SizedBox(height: 20),
         ],
@@ -2042,391 +1663,6 @@ class _ReportesAdminScreenState extends State<ReportesAdminScreen>
   }
 
   // ── Tab de Reportes Automáticos / Programados ──────────────────────────
-
-  Widget _buildProgramadosTab() {
-    return RefreshIndicator(
-      onRefresh: _cargarProgramados,
-      color: AppColors.accent,
-      child: SingleChildScrollView(
-        physics: const AlwaysScrollableScrollPhysics(),
-        padding: const EdgeInsets.all(20),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            // Cabecera informativa y botón para crear nuevo
-            Container(
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(14),
-                border: Border.all(color: AppColors.border),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withValues(alpha: 0.04),
-                    blurRadius: 8,
-                    offset: const Offset(0, 2),
-                  ),
-                ],
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    children: [
-                      Container(
-                        padding: const EdgeInsets.all(8),
-                        decoration: BoxDecoration(
-                          color: AppColors.primary.withValues(alpha: 0.1),
-                          shape: BoxShape.circle,
-                        ),
-                        child: const Icon(
-                          Icons.schedule_send,
-                          color: AppColors.primary,
-                          size: 22,
-                        ),
-                      ),
-                      const SizedBox(width: 10),
-                      const Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              'Reportes Automáticos Programados',
-                              style: TextStyle(
-                                fontSize: 15,
-                                fontWeight: FontWeight.bold,
-                                color: AppColors.textPrimary,
-                              ),
-                            ),
-                            Text(
-                              'Se generan y envían por correo periódicamente',
-                              style: TextStyle(
-                                fontSize: 11,
-                                color: AppColors.textSecondary,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 14),
-                  ElevatedButton.icon(
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: AppColors.primary,
-                      foregroundColor: Colors.white,
-                      minimumSize: const Size.fromHeight(44),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(10),
-                      ),
-                      elevation: 0,
-                    ),
-                    onPressed: _mostrarModalNuevoProgramado,
-                    icon: const Icon(Icons.add_alarm, size: 18),
-                    label: const Text(
-                      'Programar Nuevo Reporte',
-                      style: TextStyle(fontWeight: FontWeight.bold),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(height: 20),
-
-            if (_cargandoProgramados)
-              const Center(
-                child: Padding(
-                  padding: EdgeInsets.all(40),
-                  child: CircularProgressIndicator(color: AppColors.accent),
-                ),
-              )
-            else if (_errorProgramados != null)
-              Container(
-                padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(
-                  color: AppColors.danger.withValues(alpha: 0.08),
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(
-                    color: AppColors.danger.withValues(alpha: 0.3),
-                  ),
-                ),
-                child: Column(
-                  children: [
-                    Text(
-                      _errorProgramados!,
-                      style: const TextStyle(
-                        color: AppColors.danger,
-                        fontSize: 13,
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    TextButton.icon(
-                      onPressed: _cargarProgramados,
-                      icon: const Icon(Icons.refresh, size: 16),
-                      label: const Text('Reintentar'),
-                    ),
-                  ],
-                ),
-              )
-            else if (_programados.isEmpty)
-              Center(
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(vertical: 40),
-                  child: Column(
-                    children: [
-                      Icon(
-                        Icons.alarm_off_outlined,
-                        size: 64,
-                        color: Colors.grey[300],
-                      ),
-                      const SizedBox(height: 16),
-                      const Text(
-                        'No hay reportes programados',
-                        style: TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.bold,
-                          color: AppColors.textPrimary,
-                        ),
-                      ),
-                      const SizedBox(height: 6),
-                      const Text(
-                        'Crea tu primer reporte automático para recibir análisis periódicos.',
-                        textAlign: TextAlign.center,
-                        style: TextStyle(
-                          fontSize: 12,
-                          color: AppColors.textSecondary,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              )
-            else
-              ListView.separated(
-                shrinkWrap: true,
-                physics: const NeverScrollableScrollPhysics(),
-                itemCount: _programados.length,
-                separatorBuilder: (_, _) => const SizedBox(height: 14),
-                itemBuilder: (context, index) {
-                  final item = _programados[index];
-                  final ejecutandoEste = _ejecutandoId == item.id;
-
-                  return Container(
-                    padding: const EdgeInsets.all(16),
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(14),
-                      border: Border.all(
-                        color: item.activo
-                            ? AppColors.border
-                            : Colors.grey[300]!,
-                      ),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.black.withValues(alpha: 0.03),
-                          blurRadius: 6,
-                          offset: const Offset(0, 2),
-                        ),
-                      ],
-                    ),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        // Título y Switch de estado
-                        Row(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(
-                                    item.titulo,
-                                    style: TextStyle(
-                                      fontSize: 15,
-                                      fontWeight: FontWeight.bold,
-                                      color: item.activo
-                                          ? AppColors.textPrimary
-                                          : AppColors.textSecondary,
-                                    ),
-                                  ),
-                                  const SizedBox(height: 4),
-                                  Text(
-                                    '${item.frecuencia} a las ${item.hora}${item.dia != null ? ' (${item.dia})' : ''}',
-                                    style: TextStyle(
-                                      fontSize: 12,
-                                      fontWeight: FontWeight.w600,
-                                      color: item.activo
-                                          ? AppColors.primary
-                                          : AppColors.textSecondary,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                            Switch.adaptive(
-                              value: item.activo,
-                              activeThumbColor: AppColors.accent,
-                              onChanged: (val) =>
-                                  _cambiarEstadoProgramado(item, val),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 12),
-
-                        // Badges de Tipo, Formato, Sucursal
-                        Wrap(
-                          spacing: 6,
-                          runSpacing: 6,
-                          children: [
-                            _BadgeChip(
-                              icon: Icons.analytics_outlined,
-                              label: item.tipo,
-                              color: AppColors.primary,
-                            ),
-                            _BadgeChip(
-                              icon: item.formato == 'PDF'
-                                  ? Icons.picture_as_pdf
-                                  : Icons.table_chart,
-                              label: item.formato,
-                              color: item.formato == 'PDF'
-                                  ? AppColors.danger
-                                  : AppColors.success,
-                            ),
-                            if (item.sucursalNombre != null)
-                              _BadgeChip(
-                                icon: Icons.storefront,
-                                label: item.sucursalNombre!,
-                                color: AppColors.accent,
-                              )
-                            else
-                              const _BadgeChip(
-                                icon: Icons.storefront,
-                                label: 'Todas las sucursales',
-                                color: AppColors.textSecondary,
-                              ),
-                            if (item.soloBajoStock)
-                              const _BadgeChip(
-                                icon: Icons.warning_amber,
-                                label: 'Bajo stock',
-                                color: AppColors.warning,
-                              ),
-                          ],
-                        ),
-                        const SizedBox(height: 12),
-
-                        // Email destinatario
-                        Row(
-                          children: [
-                            const Icon(
-                              Icons.email_outlined,
-                              size: 14,
-                              color: AppColors.textSecondary,
-                            ),
-                            const SizedBox(width: 6),
-                            Expanded(
-                              child: Text(
-                                item.destinatarioEmail,
-                                style: const TextStyle(
-                                  fontSize: 12,
-                                  color: AppColors.textSecondary,
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-
-                        // Info de ejecuciones
-                        const SizedBox(height: 6),
-                        Row(
-                          children: [
-                            const Icon(
-                              Icons.history,
-                              size: 14,
-                              color: AppColors.textSecondary,
-                            ),
-                            const SizedBox(width: 6),
-                            Expanded(
-                              child: Text(
-                                item.ultimaEjecucion != null
-                                    ? 'Última: ${item.ultimaEjecucion}'
-                                    : 'Aún no se ha ejecutado',
-                                style: const TextStyle(
-                                  fontSize: 11,
-                                  color: AppColors.textSecondary,
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-
-                        const Divider(height: 20),
-
-                        // Acciones: Ejecutar ahora y Eliminar
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          children: [
-                            OutlinedButton.icon(
-                              style: OutlinedButton.styleFrom(
-                                foregroundColor: AppColors.primary,
-                                side: const BorderSide(
-                                  color: AppColors.primary,
-                                ),
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 14,
-                                  vertical: 8,
-                                ),
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(8),
-                                ),
-                              ),
-                              onPressed: ejecutandoEste
-                                  ? null
-                                  : () => _ejecutarProgramado(item),
-                              icon: ejecutandoEste
-                                  ? const SizedBox(
-                                      width: 14,
-                                      height: 14,
-                                      child: CircularProgressIndicator(
-                                        strokeWidth: 2,
-                                        color: AppColors.primary,
-                                      ),
-                                    )
-                                  : const Icon(
-                                      Icons.play_arrow_rounded,
-                                      size: 18,
-                                    ),
-                              label: Text(
-                                ejecutandoEste
-                                    ? 'Enviando...'
-                                    : 'Ejecutar ahora',
-                                style: const TextStyle(
-                                  fontSize: 12,
-                                  fontWeight: FontWeight.bold,
-                                ),
-                              ),
-                            ),
-                            IconButton(
-                              icon: const Icon(
-                                Icons.delete_outline,
-                                color: AppColors.danger,
-                                size: 20,
-                              ),
-                              tooltip: 'Eliminar programación',
-                              onPressed: () => _eliminarProgramado(item),
-                            ),
-                          ],
-                        ),
-                      ],
-                    ),
-                  );
-                },
-              ),
-          ],
-        ),
-      ),
-    );
-  }
 }
 
 // ─── Widgets auxiliares ───────────────────────────────────────────────────────
@@ -2484,44 +1720,6 @@ class _DropdownFiltro<T> extends StatelessWidget {
           ],
           onChanged: onChanged,
         ),
-      ),
-    );
-  }
-}
-
-class _BadgeChip extends StatelessWidget {
-  final IconData icon;
-  final String label;
-  final Color color;
-
-  const _BadgeChip({
-    required this.icon,
-    required this.label,
-    required this.color,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-      decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.1),
-        borderRadius: BorderRadius.circular(6),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(icon, size: 12, color: color),
-          const SizedBox(width: 4),
-          Text(
-            label,
-            style: TextStyle(
-              fontSize: 11,
-              fontWeight: FontWeight.w600,
-              color: color,
-            ),
-          ),
-        ],
       ),
     );
   }
@@ -2975,21 +2173,20 @@ class _BarChartCustom extends StatelessWidget {
 class _TablaReporte extends StatefulWidget {
   final List<ReporteColumna> columnas;
   final List<Map<String, dynamic>> filas;
-  const _TablaReporte({required this.columnas, required this.filas});
+  const _TablaReporte({super.key, required this.columnas, required this.filas});
 
   @override
   State<_TablaReporte> createState() => _TablaReporteState();
 }
 
 class _TablaReporteState extends State<_TablaReporte> {
-  static const _pageSize = 15;
   int _pagina = 0;
 
   @override
   Widget build(BuildContext context) {
-    final totalPaginas = (widget.filas.length / _pageSize).ceil();
-    final inicio = _pagina * _pageSize;
-    final fin = (inicio + _pageSize).clamp(0, widget.filas.length);
+    const totalPaginas = 1;
+    const inicio = 0;
+    final fin = widget.filas.length;
     final filasActuales = widget.filas.sublist(inicio, fin);
 
     return Container(
@@ -3101,9 +2298,9 @@ class _TablaReporteState extends State<_TablaReporte> {
 
 class _ExportButtons extends StatelessWidget {
   final bool exportando;
-  final VoidCallback onPdf;
-  final VoidCallback onExcel;
-  final VoidCallback onHtml;
+  final VoidCallback? onPdf;
+  final VoidCallback? onExcel;
+  final VoidCallback? onHtml;
   const _ExportButtons({
     required this.exportando,
     required this.onPdf,
@@ -3168,7 +2365,7 @@ class _ExportButton extends StatelessWidget {
   final String label;
   final IconData icon;
   final Color color;
-  final VoidCallback onPressed;
+  final VoidCallback? onPressed;
 
   const _ExportButton({
     required this.label,

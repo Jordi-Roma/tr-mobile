@@ -22,6 +22,7 @@ class UsuarioAutenticado {
   String get nombreCompleto => '$nombre $apellido'.trim();
   bool get esCliente => roles.contains('CLIENTE');
   bool get esAdmin => roles.contains('ADMINISTRADOR');
+  bool get esAdminSaas => roles.contains('ADMIN_SAAS');
   bool get esEncargado => roles.contains('ENCARGADO_SUCURSAL');
   bool get esCajero => roles.contains('CAJERO');
   bool get esProveedor => roles.contains('PROVEEDOR');

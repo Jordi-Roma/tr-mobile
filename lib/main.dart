@@ -1,4 +1,6 @@
+import 'screens/notificaciones/puente_push.dart';
 import 'services/firebase_push_service.dart';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:intl/date_symbol_data_local.dart';
@@ -6,6 +8,8 @@ import 'package:provider/provider.dart';
 
 import 'core/theme/app_theme.dart';
 import 'providers/auth_provider.dart';
+import 'providers/plan_provider.dart';
+import 'screens/saas/plataforma_screen.dart';
 import 'providers/carrito_provider.dart';
 import 'providers/catalogo_provider.dart';
 import 'providers/favoritos_provider.dart';
@@ -18,6 +22,10 @@ void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await initializeDateFormatting('es', null);
   FirebasePush.iniciar();
+  await FirebasePush.preparar().timeout(
+    const Duration(seconds: 8),
+    onTimeout: () {},
+  );
   runApp(const StyleARApp());
 }
 
@@ -33,36 +41,47 @@ class StyleARApp extends StatelessWidget {
           return MultiProvider(
             key: ValueKey(auth.generacion),
             providers: [
+              ChangeNotifierProvider(
+                create: (_) => PlanProvider(),
+                lazy: false,
+              ),
               ChangeNotifierProvider(create: (_) => CatalogoProvider()),
               ChangeNotifierProvider(create: (_) => CarritoProvider()),
               ChangeNotifierProvider(create: (_) => ReservaProvider()),
               ChangeNotifierProvider(create: (_) => FavoritosProvider()),
             ],
-            child: MaterialApp(
-              key: ValueKey(auth.generacion),
-              title: 'StyleAR',
-              debugShowCheckedModeBanner: false,
-              theme: AppTheme.lightTheme,
-              localizationsDelegates: const [
-                GlobalMaterialLocalizations.delegate,
-                GlobalWidgetsLocalizations.delegate,
-                GlobalCupertinoLocalizations.delegate,
-              ],
-              supportedLocales: const [
-                Locale('es', 'BO'),
-                Locale('es', ''),
-                Locale('en', ''),
-              ],
-              locale: const Locale('es'),
-              home: !auth.inicializado
-                  ? const Scaffold(
-                      body: Center(child: CircularProgressIndicator()),
-                    )
-                  : auth.empresa == null
-                  ? const EmpresaScreen()
-                  : auth.requiereLogin
-                  ? const LoginScreen()
-                  : const _TiendaSesion(),
+            child: PuentePush(
+              builder: (navigatorKey) => MaterialApp(
+                navigatorKey: navigatorKey,
+                key: ValueKey(auth.generacion),
+                title: 'StyleAR',
+                debugShowCheckedModeBanner: false,
+                theme: AppTheme.lightTheme,
+                localizationsDelegates: const [
+                  GlobalMaterialLocalizations.delegate,
+                  GlobalWidgetsLocalizations.delegate,
+                  GlobalCupertinoLocalizations.delegate,
+                ],
+                supportedLocales: const [
+                  Locale('es', 'BO'),
+                  Locale('es', ''),
+                  Locale('en', ''),
+                ],
+                locale: const Locale('es'),
+                home: !auth.inicializado
+                    ? const Scaffold(
+                        body: Center(child: CircularProgressIndicator()),
+                      )
+                    : auth.esAdminSaas
+                    ? const PlataformaScreen()
+                    : auth.modoPlataforma
+                    ? const LoginScreen()
+                    : auth.empresa == null
+                    ? const EmpresaScreen()
+                    : auth.requiereLogin
+                    ? const LoginScreen()
+                    : const _TiendaSesion(),
+              ),
             ),
           );
         },

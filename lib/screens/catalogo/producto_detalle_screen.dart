@@ -1,4 +1,9 @@
+import '../../core/session/contexto_sesion.dart';
+import '../asistente/asistente_screen.dart';
+import '../../models/asistente_models.dart';
+import '../saas/saas_widgets.dart';
 import '../mayorista/mayorista_screen.dart';
+
 import 'dart:convert';
 
 import 'package:flutter/material.dart';
@@ -25,44 +30,68 @@ import '../vestidor/vestidor_en_vivo_screen.dart';
 
 class ProductoDetalleScreen extends StatefulWidget {
   final int productoId;
-
   const ProductoDetalleScreen({super.key, required this.productoId});
-
   @override
   State<ProductoDetalleScreen> createState() => _ProductoDetalleScreenState();
 }
 
-class _ProductoDetalleScreenState extends State<ProductoDetalleScreen> {
+class _ProductoDetalleScreenState extends State<ProductoDetalleScreen>
+    with PantallaSesion {
   CatalogoVariante? _varianteSeleccionada;
   int _cantidad = 1;
   List<RecomendacionPrendaItem> _recomendaciones = [];
   bool _cargandoRecomendaciones = false;
-
+  int _consultaRecomendaciones = 0;
   @override
   void initState() {
     super.initState();
+    ContextoSesion.instance.addListener(_cambioContexto);
     WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!vigente) return;
       context.read<CatalogoProvider>().cargarPrendaDetalle(widget.productoId);
       _cargarRecomendaciones();
     });
   }
 
+  void _cambioContexto() {
+    if (!vigente && mounted) {
+      setState(() {
+        _recomendaciones = [];
+        _varianteSeleccionada = null;
+      });
+    }
+  }
+
+  @override
+  void dispose() {
+    ContextoSesion.instance.removeListener(_cambioContexto);
+    super.dispose();
+  }
+
   Future<void> _cargarRecomendaciones() async {
+    final consulta = ++_consultaRecomendaciones;
     setState(() => _cargandoRecomendaciones = true);
     try {
       final items = await RecomendacionService.obtenerPorProducto(
         widget.productoId,
+        sucursalId: context.read<CatalogoProvider>().filtroSucursalId,
+        tallaId: _varianteSeleccionada?.tallaId,
       );
-      if (mounted) setState(() => _recomendaciones = items);
+      if (vigente && consulta == _consultaRecomendaciones) {
+        setState(() => _recomendaciones = items);
+      }
     } catch (_) {
     } finally {
-      if (mounted) setState(() => _cargandoRecomendaciones = false);
+      if (vigente && consulta == _consultaRecomendaciones) {
+        setState(() => _cargandoRecomendaciones = false);
+      }
     }
   }
 
-
-
-  void _abrirModalOpcionesVestidor(CatalogoPrendaDetalle detalle, CatalogoVariante? varianteActual) {
+  void _abrirModalOpcionesVestidor(
+    CatalogoPrendaDetalle detalle,
+    CatalogoVariante? varianteActual,
+  ) {
     showModalBottomSheet(
       context: context,
       backgroundColor: const Color(0xFF0F172A),
@@ -97,7 +126,11 @@ class _ProductoDetalleScreenState extends State<ProductoDetalleScreen> {
                         color: const Color(0xFF00E5FF).withValues(alpha: 0.15),
                         shape: BoxShape.circle,
                       ),
-                      child: const Icon(Icons.checkroom_rounded, color: Color(0xFF00E5FF), size: 24),
+                      child: const Icon(
+                        Icons.checkroom_rounded,
+                        color: Color(0xFF00E5FF),
+                        size: 24,
+                      ),
                     ),
                     const SizedBox(width: 14),
                     Expanded(
@@ -117,7 +150,10 @@ class _ProductoDetalleScreenState extends State<ProductoDetalleScreen> {
                             detalle.nombre,
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
-                            style: const TextStyle(color: Colors.white60, fontSize: 12),
+                            style: const TextStyle(
+                              color: Colors.white60,
+                              fontSize: 12,
+                            ),
                           ),
                         ],
                       ),
@@ -125,7 +161,6 @@ class _ProductoDetalleScreenState extends State<ProductoDetalleScreen> {
                   ],
                 ),
                 const SizedBox(height: 20),
-
                 // OPCIÓN 1: Simulador con IA (SIEMPRE DISPONIBLE PARA TODOS LOS PRODUCTOS)
                 GestureDetector(
                   onTap: () {
@@ -154,7 +189,8 @@ class _ProductoDetalleScreenState extends State<ProductoDetalleScreen> {
                       ),
                       boxShadow: [
                         BoxShadow(
-                          color: const Color(0xFF00E5FF).withValues(alpha: 0.12),
+                          color: const Color(0xFF00E5FF)
+                              .withValues(alpha: 0.12),
                           blurRadius: 10,
                           offset: const Offset(0, 4),
                         ),
@@ -166,7 +202,8 @@ class _ProductoDetalleScreenState extends State<ProductoDetalleScreen> {
                           width: 48,
                           height: 48,
                           decoration: BoxDecoration(
-                            color: const Color(0xFF00E5FF).withValues(alpha: 0.2),
+                            color: const Color(0xFF00E5FF)
+                                .withValues(alpha: 0.2),
                             borderRadius: BorderRadius.circular(14),
                           ),
                           child: const Icon(
@@ -192,9 +229,13 @@ class _ProductoDetalleScreenState extends State<ProductoDetalleScreen> {
                                   ),
                                   const Spacer(),
                                   Container(
-                                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 8,
+                                      vertical: 3,
+                                    ),
                                     decoration: BoxDecoration(
-                                      color: const Color(0xFF10B981).withValues(alpha: 0.2),
+                                      color: const Color(0xFF10B981)
+                                          .withValues(alpha: 0.2),
                                       borderRadius: BorderRadius.circular(8),
                                     ),
                                     child: const Text(
@@ -224,9 +265,7 @@ class _ProductoDetalleScreenState extends State<ProductoDetalleScreen> {
                     ),
                   ),
                 ),
-
                 const SizedBox(height: 14),
-
                 // OPCIÓN 2: Vestidor en Vivo con IA (Cámara en Tiempo Real - Decart Lucy 3.5)
                 GestureDetector(
                   onTap: () {
@@ -255,7 +294,8 @@ class _ProductoDetalleScreenState extends State<ProductoDetalleScreen> {
                       ),
                       boxShadow: [
                         BoxShadow(
-                          color: const Color(0xFF10B981).withValues(alpha: 0.12),
+                          color: const Color(0xFF10B981)
+                              .withValues(alpha: 0.12),
                           blurRadius: 10,
                           offset: const Offset(0, 4),
                         ),
@@ -267,7 +307,8 @@ class _ProductoDetalleScreenState extends State<ProductoDetalleScreen> {
                           width: 48,
                           height: 48,
                           decoration: BoxDecoration(
-                            color: const Color(0xFF10B981).withValues(alpha: 0.2),
+                            color: const Color(0xFF10B981)
+                                .withValues(alpha: 0.2),
                             borderRadius: BorderRadius.circular(14),
                           ),
                           child: const Icon(
@@ -293,9 +334,13 @@ class _ProductoDetalleScreenState extends State<ProductoDetalleScreen> {
                                   ),
                                   const Spacer(),
                                   Container(
-                                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 8,
+                                      vertical: 3,
+                                    ),
                                     decoration: BoxDecoration(
-                                      color: const Color(0xFF10B981).withValues(alpha: 0.2),
+                                      color: const Color(0xFF10B981)
+                                          .withValues(alpha: 0.2),
                                       borderRadius: BorderRadius.circular(8),
                                     ),
                                     child: const Text(
@@ -325,9 +370,7 @@ class _ProductoDetalleScreenState extends State<ProductoDetalleScreen> {
                     ),
                   ),
                 ),
-
                 const SizedBox(height: 16),
-
                 // Acceso al Estudio de Outfits Completo (VestidorScreen)
                 Center(
                   child: TextButton.icon(
@@ -342,7 +385,11 @@ class _ProductoDetalleScreenState extends State<ProductoDetalleScreen> {
                         ),
                       );
                     },
-                    icon: const Icon(Icons.style_outlined, color: Colors.white60, size: 16),
+                    icon: const Icon(
+                      Icons.style_outlined,
+                      color: Colors.white60,
+                      size: 16,
+                    ),
                     label: const Text(
                       'Combinar en Estudio de Outfits Completo',
                       style: TextStyle(
@@ -515,14 +562,12 @@ class _ProductoDetalleScreenState extends State<ProductoDetalleScreen> {
           ],
         ),
       );
-
       if (quiereIniciar == true && mounted) {
         Navigator.of(context)
             .push(MaterialPageRoute(builder: (_) => const LoginScreen()));
       }
       return;
     }
-
     final variante =
         _varianteSeleccionada ??
         (detalle.variantes.isNotEmpty ? detalle.variantes.first : null);
@@ -534,7 +579,6 @@ class _ProductoDetalleScreenState extends State<ProductoDetalleScreen> {
       );
       return;
     }
-
     if (variante.stockTotal <= 0) {
       ScaffoldMessenger.of(context).hideCurrentSnackBar();
       ScaffoldMessenger.of(context).showSnackBar(
@@ -546,13 +590,11 @@ class _ProductoDetalleScreenState extends State<ProductoDetalleScreen> {
       );
       return;
     }
-
     final carrito = context.read<CarritoProvider>();
     final ok = await carrito.agregarItem(
       varianteId: variante.id,
       cantidad: _cantidad,
     );
-
     if (ok && mounted) {
       ScaffoldMessenger.of(context).hideCurrentSnackBar();
       ScaffoldMessenger.of(context).showSnackBar(
@@ -619,20 +661,25 @@ class _ProductoDetalleScreenState extends State<ProductoDetalleScreen> {
 
   @override
   Widget build(BuildContext context) {
+    if (!vigente) {
+      return const Scaffold(
+        body: Center(
+          child: Text('Cambió la tienda o sesión. Vuelve al catálogo.'),
+        ),
+      );
+    }
     final catalogo = context.watch<CatalogoProvider>();
     final detalle = catalogo.detalleSeleccionado;
     final currencyFormat = NumberFormat.currency(
       locale: 'es_BO',
       symbol: 'Bs. ',
     );
-
     if (catalogo.cargandoDetalle || detalle == null) {
       return Scaffold(
         appBar: AppBar(),
         body: const Center(child: CircularProgressIndicator()),
       );
     }
-
     // Si aún no se seleccionó variante, se usa la primera por defecto
     final varianteActual =
         _varianteSeleccionada ??
@@ -642,11 +689,28 @@ class _ProductoDetalleScreenState extends State<ProductoDetalleScreen> {
         varianteActual?.tienePromocion ?? detalle.tienePromocion;
     final precioVigente =
         varianteActual?.precioVigente ?? detalle.precioVigente;
-
     return Scaffold(
       appBar: AppBar(
         title: Text(detalle.nombre),
         actions: [
+          IconButton(
+            tooltip: 'Consultar esta prenda',
+            icon: const Icon(Icons.chat_outlined),
+            onPressed: () => Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (_) => AsistenteScreen(
+                  contextoInicial: AsistenteContexto(
+                    productoId: widget.productoId,
+                    varianteId: varianteActual?.id,
+                    sucursalId: context
+                        .read<CatalogoProvider>()
+                        .filtroSucursalId,
+                  ),
+                ),
+              ),
+            ),
+          ),
           Consumer2<AuthProvider, FavoritosProvider>(
             builder: (context, auth, favProvider, _) {
               final esFav = favProvider.esFavorito(widget.productoId);
@@ -735,7 +799,6 @@ class _ProductoDetalleScreenState extends State<ProductoDetalleScreen> {
                   children: [
                     // Imagen principal
                     _buildImage(detalle.imagenPrincipal),
-
                     Padding(
                       padding: const EdgeInsets.all(20),
                       child: Column(
@@ -758,7 +821,6 @@ class _ProductoDetalleScreenState extends State<ProductoDetalleScreen> {
                             ],
                           ),
                           const SizedBox(height: 8),
-
                           // Nombre de la prenda
                           Text(
                             detalle.nombre,
@@ -770,7 +832,6 @@ class _ProductoDetalleScreenState extends State<ProductoDetalleScreen> {
                             ),
                           ),
                           const SizedBox(height: 8),
-
                           // Precio
                           Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
@@ -823,7 +884,6 @@ class _ProductoDetalleScreenState extends State<ProductoDetalleScreen> {
                           const SizedBox(height: 20),
                           const Divider(),
                           const SizedBox(height: 16),
-
                           // Selector de Variantes (Talla y Color)
                           if (detalle.variantes.isNotEmpty) ...[
                             const Text(
@@ -865,22 +925,25 @@ class _ProductoDetalleScreenState extends State<ProductoDetalleScreen> {
                                         : FontWeight.normal,
                                     fontSize: 12,
                                   ),
-                                  onSelected: sinStock ? null : (selected) {
-                                    if (selected) {
-                                      setState(() {
-                                        _varianteSeleccionada = variante;
-                                        if (_cantidad > variante.stockTotal) {
-                                          _cantidad = variante.stockTotal;
-                                        }
-                                      });
-                                    }
-                                  },
+                                  onSelected: sinStock
+                                      ? null
+                                      : (selected) {
+                                          if (selected) {
+                                            setState(() {
+                                              _varianteSeleccionada = variante;
+                                              if (_cantidad >
+                                                  variante.stockTotal) {
+                                                _cantidad = variante.stockTotal;
+                                              }
+                                            });
+                                            _cargarRecomendaciones();
+                                          }
+                                        },
                                 );
                               }).toList(),
                             ),
                             const SizedBox(height: 20),
                           ],
-
                           // Botón Probar en Vestidor Virtual (CU24) - Siempre activo para todo el catálogo
                           Container(
                             margin: const EdgeInsets.only(bottom: 12),
@@ -890,11 +953,13 @@ class _ProductoDetalleScreenState extends State<ProductoDetalleScreen> {
                                 colors: [Color(0xFF0F172A), Color(0xFF1E293B)],
                               ),
                               border: Border.all(
-                                color: const Color(0xFF00E5FF).withValues(alpha: 0.35),
+                                color: const Color(0xFF00E5FF)
+                                    .withValues(alpha: 0.35),
                               ),
                               boxShadow: [
                                 BoxShadow(
-                                  color: const Color(0xFF0F172A).withValues(alpha: 0.3),
+                                  color: const Color(0xFF0F172A)
+                                      .withValues(alpha: 0.3),
                                   blurRadius: 8,
                                   offset: const Offset(0, 3),
                                 ),
@@ -904,7 +969,10 @@ class _ProductoDetalleScreenState extends State<ProductoDetalleScreen> {
                               color: Colors.transparent,
                               child: InkWell(
                                 borderRadius: BorderRadius.circular(14),
-                                onTap: () => _abrirModalOpcionesVestidor(detalle, varianteActual),
+                                onTap: () => _abrirModalOpcionesVestidor(
+                                  detalle,
+                                  varianteActual,
+                                ),
                                 child: const Padding(
                                   padding: EdgeInsets.symmetric(
                                     vertical: 14,
@@ -934,7 +1002,6 @@ class _ProductoDetalleScreenState extends State<ProductoDetalleScreen> {
                               ),
                             ),
                           ),
-
                           // Botón para consultar disponibilidad por sucursal
                           OutlinedButton.icon(
                             icon: const Icon(
@@ -950,11 +1017,9 @@ class _ProductoDetalleScreenState extends State<ProductoDetalleScreen> {
                             onPressed: () =>
                                 _abrirDisponibilidadPorSucursal(detalle),
                           ),
-
                           const SizedBox(height: 20),
                           const Divider(),
                           const SizedBox(height: 16),
-
                           // Selector de Cantidad
                           Row(
                             mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -990,8 +1055,10 @@ class _ProductoDetalleScreenState extends State<ProductoDetalleScreen> {
                                     ),
                                     IconButton(
                                       icon: const Icon(Icons.add, size: 18),
-                                      onPressed: varianteActual != null &&
-                                              varianteActual.stockTotal > _cantidad
+                                      onPressed:
+                                          varianteActual != null &&
+                                              varianteActual.stockTotal >
+                                                  _cantidad
                                           ? () => setState(() => _cantidad++)
                                           : null,
                                     ),
@@ -1001,13 +1068,19 @@ class _ProductoDetalleScreenState extends State<ProductoDetalleScreen> {
                             ],
                           ),
                           const SizedBox(height: 24),
-
                           OutlinedButton.icon(
                             icon: const Icon(Icons.inventory_2_outlined),
                             label: const Text('Comprar por mayor · paquetes'),
-                            onPressed: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => MayoristaScreen(detalle: detalle))),
+                            onPressed: () => Navigator.of(context).push(
+                              MaterialPageRoute(
+                                builder: (_) =>
+                                    MayoristaScreen(detalle: detalle),
+                              ),
+                            ),
                           ),
-                          const Text('La compra unitaria mantiene cantidades libres por talla y color.'),
+                          const Text(
+                            'La compra unitaria mantiene cantidades libres por talla y color.',
+                          ),
                           // Descripción y Detalles
                           if (detalle.descripcion != null &&
                               detalle.descripcion!.isNotEmpty) ...[
@@ -1103,7 +1176,6 @@ class _ProductoDetalleScreenState extends State<ProductoDetalleScreen> {
                 ),
               ),
             ),
-
             // Barra Inferior Fija para Agregar al Carrito
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),

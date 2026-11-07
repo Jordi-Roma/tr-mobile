@@ -13,6 +13,7 @@ class ContextoSesion extends ChangeNotifier {
   String? token;
   String? aviso;
   bool requiereLogin = false;
+  bool modoPlataforma = false;
   int generacion = 0;
   Future<void> _persistencia = Future.value();
 
@@ -31,17 +32,24 @@ class ContextoSesion extends ChangeNotifier {
         utf8.decode(base64Url.decode(base64Url.normalize(partes[1]))),
       ) as Map<String, dynamic>;
       final exp = cuerpo['exp'];
+      final plataforma =
+          usuario.roles.contains('ADMIN_SAAS') &&
+          usuario.empresaId == null &&
+          usuario.empresaCodigo == null &&
+          cuerpo['empresa_codigo'] == null;
+      final comercial =
+          !usuario.roles.contains('ADMIN_SAAS') &&
+          usuario.empresaId != null &&
+          usuario.empresaId! > 0 &&
+          usuario.empresaCodigo != null &&
+          RegExp(r'^[a-z0-9][a-z0-9-]{1,39}$').hasMatch(usuario.empresaCodigo!);
       return exp is num &&
           exp * 1000 > DateTime.now().millisecondsSinceEpoch &&
           cuerpo['sid'] != null &&
           cuerpo['sub'].toString() == usuario.id.toString() &&
           cuerpo.containsKey('empresa_id') &&
           cuerpo['empresa_id'] == usuario.empresaId &&
-          usuario.empresaId != null &&
-          usuario.empresaCodigo != null &&
-          RegExp(r'^[a-z0-9][a-z0-9-]{1,39}$')
-              .hasMatch(usuario.empresaCodigo!) &&
-          !usuario.roles.contains('ADMIN_SAAS');
+          (plataforma || comercial);
     } catch (_) {
       return false;
     }
@@ -52,6 +60,7 @@ class ContextoSesion extends ChangeNotifier {
       throw StateError('Empresa no disponible.');
     }
     empresa = seleccion;
+    modoPlataforma = false;
     usuario = null;
     token = null;
     aviso = null;
@@ -64,11 +73,18 @@ class ContextoSesion extends ChangeNotifier {
     });
   }
 
+  Future<void> abrirPlataforma() async {
+    await seleccionar(null);
+    modoPlataforma = true;
+    notifyListeners();
+  }
+
   Future<void> guardar(
     String nuevoToken,
     UsuarioAutenticado nuevoUsuario,
   ) async {
     if (!sesionValida(nuevoToken, nuevoUsuario) ||
+        modoPlataforma != nuevoUsuario.roles.contains('ADMIN_SAAS') ||
         empresa?.id != nuevoUsuario.empresaId ||
         empresa?.codigo != nuevoUsuario.empresaCodigo) {
       throw StateError('La sesión no corresponde a la empresa elegida.');

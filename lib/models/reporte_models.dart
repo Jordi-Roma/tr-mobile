@@ -29,6 +29,7 @@ class ReporteFiltros {
   final int? sucursalId;
   final String agrupacion; // 'DIA' | 'MES'
   final bool soloBajoStock;
+  final String? tipoVenta;
   final String? estado;
   final String? metodoPago;
   final String? proveedorPago;
@@ -43,6 +44,7 @@ class ReporteFiltros {
     this.sucursalId,
     this.agrupacion = 'DIA',
     this.soloBajoStock = false,
+    this.tipoVenta,
     this.estado,
     this.metodoPago,
     this.proveedorPago,
@@ -52,19 +54,20 @@ class ReporteFiltros {
   });
 
   Map<String, dynamic> toJson() => {
-        'tipo': tipo.valor,
-        'fecha_desde': fechaDesde,
-        'fecha_hasta': fechaHasta,
-        'sucursal_id': sucursalId,
-        'agrupacion': agrupacion,
-        'solo_bajo_stock': soloBajoStock,
-        'estado': estado,
-        'metodo_pago': metodoPago,
-        'proveedor_pago': proveedorPago,
-        'tipo_entrega': tipoEntrega,
-        'rol': rol,
-        'activo': activo,
-      };
+    'tipo': tipo.valor,
+    'fecha_desde': fechaDesde,
+    'fecha_hasta': fechaHasta,
+    'sucursal_id': sucursalId,
+    'agrupacion': agrupacion,
+    'solo_bajo_stock': soloBajoStock,
+    'tipo_venta': tipoVenta,
+    'estado': estado,
+    'metodo_pago': metodoPago,
+    'proveedor_pago': proveedorPago,
+    'tipo_entrega': tipoEntrega,
+    'rol': rol,
+    'activo': activo,
+  };
 }
 
 class ReporteCatalogoItem {
@@ -126,7 +129,7 @@ class ReporteIndicador {
   factory ReporteIndicador.fromJson(Map<String, dynamic> json) =>
       ReporteIndicador(
         label: json['label']?.toString() ?? '',
-        valor: (json['valor'] as num?) ?? 0,
+        valor: num.tryParse(json['valor'].toString()) ?? 0,
       );
 }
 
@@ -139,7 +142,7 @@ class ReporteSerieItem {
   factory ReporteSerieItem.fromJson(Map<String, dynamic> json) =>
       ReporteSerieItem(
         label: json['label']?.toString() ?? '',
-        valor: (json['valor'] as num?) ?? 0,
+        valor: num.tryParse(json['valor'].toString()) ?? 0,
       );
 }
 
@@ -150,9 +153,9 @@ class ReporteColumna {
   const ReporteColumna({required this.key, required this.label});
 
   factory ReporteColumna.fromJson(Map<String, dynamic> json) => ReporteColumna(
-        key: json['key']?.toString() ?? '',
-        label: json['label']?.toString() ?? '',
-      );
+    key: json['key']?.toString() ?? '',
+    label: json['label']?.toString() ?? '',
+  );
 }
 
 class ReporteResultado {
@@ -166,6 +169,8 @@ class ReporteResultado {
   final List<Map<String, dynamic>> filas;
   final int totalFilas;
   final bool sinDatos;
+  final int pagina, tamano;
+  final Map<String, dynamic> resumen, filtrosEfectivos;
 
   const ReporteResultado({
     required this.tipo,
@@ -178,6 +183,10 @@ class ReporteResultado {
     required this.filas,
     required this.totalFilas,
     required this.sinDatos,
+    this.pagina = 1,
+    this.tamano = 20,
+    this.resumen = const {},
+    this.filtrosEfectivos = const {},
   });
 
   factory ReporteResultado.fromJson(Map<String, dynamic> json) {
@@ -202,6 +211,12 @@ class ReporteResultado {
           ? json['total_filas']
           : int.tryParse(json['total_filas']?.toString() ?? '0') ?? 0,
       sinDatos: json['sin_datos'] == true,
+      pagina: (json['pagina'] as num?)?.toInt() ?? 1,
+      tamano: (json['tamano'] as num?)?.toInt() ?? 20,
+      resumen: Map<String, dynamic>.from(json['resumen'] as Map? ?? {}),
+      filtrosEfectivos: Map<String, dynamic>.from(
+        json['filtros_efectivos'] as Map? ?? {},
+      ),
     );
   }
 }
@@ -219,6 +234,10 @@ class ReporteProgramadoItem {
   final String? sucursalNombre;
   final bool soloBajoStock;
   final bool activo;
+  final int revision;
+  final String zonaHoraria, periodo;
+  final String? motivoPausa;
+  final Map<String, dynamic> filtros;
   final String? ultimaEjecucion;
   final String? proximaEjecucion;
 
@@ -235,13 +254,20 @@ class ReporteProgramadoItem {
     this.sucursalNombre,
     required this.soloBajoStock,
     required this.activo,
+    this.revision = 1,
+    this.zonaHoraria = 'America/La_Paz',
+    this.periodo = 'SEGUN_FRECUENCIA',
+    this.motivoPausa,
+    this.filtros = const {},
     this.ultimaEjecucion,
     this.proximaEjecucion,
   });
 
   factory ReporteProgramadoItem.fromJson(Map<String, dynamic> json) {
     return ReporteProgramadoItem(
-      id: json['id'] is int ? json['id'] : int.tryParse(json['id'].toString()) ?? 0,
+      id: json['id'] is int
+          ? json['id']
+          : int.tryParse(json['id'].toString()) ?? 0,
       titulo: json['titulo']?.toString() ?? '',
       tipo: json['tipo']?.toString() ?? 'VENTAS',
       frecuencia: json['frecuencia']?.toString() ?? 'DIARIA',
@@ -251,12 +277,17 @@ class ReporteProgramadoItem {
       destinatarioEmail: json['destinatario_email']?.toString() ?? '',
       sucursalId: json['sucursal_id'] != null
           ? (json['sucursal_id'] is int
-              ? json['sucursal_id']
-              : int.tryParse(json['sucursal_id'].toString()))
+                ? json['sucursal_id']
+                : int.tryParse(json['sucursal_id'].toString()))
           : null,
       sucursalNombre: json['sucursal_nombre']?.toString(),
       soloBajoStock: json['solo_bajo_stock'] == true,
       activo: json['activo'] == true,
+      revision: (json['revision'] as num?)?.toInt() ?? 1,
+      zonaHoraria: json['zona_horaria'] as String? ?? 'America/La_Paz',
+      periodo: json['periodo'] as String? ?? 'SEGUN_FRECUENCIA',
+      motivoPausa: json['motivo_pausa'] as String?,
+      filtros: Map<String, dynamic>.from(json['filtros'] as Map? ?? {}),
       ultimaEjecucion: json['ultima_ejecucion']?.toString(),
       proximaEjecucion: json['proxima_ejecucion']?.toString(),
     );
@@ -286,4 +317,3 @@ class ReporteInterpretacionResultado {
     );
   }
 }
-

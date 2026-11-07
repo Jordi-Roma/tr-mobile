@@ -1,3 +1,4 @@
+import '../services/firebase_push_service.dart';
 import 'dart:async';
 
 import 'package:flutter/material.dart';
@@ -53,6 +54,9 @@ class AuthProvider extends ChangeNotifier {
   bool get estaAutenticado => token != null && usuario != null;
   bool get esCliente => usuario?.esCliente ?? false;
   bool get esAdmin => usuario?.esAdmin ?? false;
+  bool get esAdminSaas => usuario?.esAdminSaas ?? false;
+  bool get modoPlataforma => contexto.modoPlataforma;
+  Future<void> abrirPlataforma() => contexto.abrirPlataforma();
   bool get esEncargado => usuario?.esEncargado ?? false;
   bool get esCajero => usuario?.esCajero ?? false;
   bool get esProveedor => usuario?.esProveedor ?? false;
@@ -74,7 +78,13 @@ class AuthProvider extends ChangeNotifier {
       final codigo =
           await SessionStorage.getEmpresaCodigo() ??
           guardadoUsuario?.empresaCodigo;
-      if (codigo != null) {
+      if (guardadoToken != null &&
+          guardadoUsuario?.esAdminSaas == true &&
+          ContextoSesion.sesionValida(guardadoToken, guardadoUsuario!)) {
+        await contexto.abrirPlataforma();
+        await contexto.guardar(guardadoToken, guardadoUsuario);
+        await ApiClient.get(ApiConstants.perfil);
+      } else if (codigo != null) {
         final res = await ApiClient.get(
           '${ApiConstants.baseUrl}/empresas/publica/${Uri.encodeComponent(codigo)}',
           withAuth: false,
@@ -105,7 +115,7 @@ class AuthProvider extends ChangeNotifier {
             (habiaSesion
                 ? 'No se pudo verificar tu sesión. Inicia sesión nuevamente.'
                 : null),
-        pedirLogin: habiaSesion && contexto.empresa != null,
+        pedirLogin: habiaSesion && (contexto.empresa != null || modoPlataforma),
       );
       if (contexto.empresa == null) _error = 'No se pudo verificar la empresa guardada. Elige una tienda disponible.';
     } finally {
@@ -155,13 +165,15 @@ class AuthProvider extends ChangeNotifier {
 
   Future<bool> login(String identificador, String password) =>
       _accion(() async {
-        if (empresa == null) throw StateError('Selecciona una empresa.');
+        if (empresa == null && !modoPlataforma) {
+          throw StateError('Selecciona una empresa.');
+        }
         final res = await ApiClient.post(
           ApiConstants.login,
           body: {
             'identificador': identificador.trim(),
             'password': password,
-            'empresa_codigo': empresa!.codigo,
+            'empresa_codigo': modoPlataforma ? null : empresa!.codigo,
           },
           withAuth: false,
         );
@@ -205,6 +217,7 @@ class AuthProvider extends ChangeNotifier {
   });
 
   Future<void> logout() async {
+    await FirebasePush.desvincular();
     if (token != null) {
       try {
         await ApiClient.post(ApiConstants.logout, body: {});
