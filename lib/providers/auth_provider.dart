@@ -1,6 +1,8 @@
 import '../services/firebase_push_service.dart';
+
 import 'dart:async';
 
+import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:flutter/material.dart';
 
 import '../core/constants/api_constants.dart';
@@ -8,6 +10,7 @@ import '../core/network/api_client.dart';
 import '../core/network/api_exceptions.dart';
 import '../core/session/contexto_sesion.dart';
 import '../core/storage/session_storage.dart';
+import '../core/storage/sesion_offline.dart';
 import '../models/auth_models.dart';
 import '../models/empresa_models.dart';
 import '../models/perfil_models.dart';
@@ -16,7 +19,9 @@ class AuthProvider extends ChangeNotifier {
   final contexto = ContextoSesion.instance;
   bool _cargando = false;
   bool _inicializado = false;
+  bool _verificando = false;
   String? _error;
+  SesionOffline? accesoOffline;
   late final Timer _caducidad;
 
   AuthProvider() {
@@ -25,12 +30,16 @@ class AuthProvider extends ChangeNotifier {
       if (contexto.token != null &&
           contexto.usuario != null &&
           !ContextoSesion.sesionValida(contexto.token!, contexto.usuario!)) {
-        unawaited(
-          contexto.cerrar(
-            mensaje: 'Tu sesión venció. Inicia sesión nuevamente.',
-            pedirLogin: true,
-          ),
-        );
+        if (SesionOffline.disponible) {
+          unawaited(inicializar());
+        } else {
+          unawaited(
+            contexto.cerrar(
+              mensaje: 'Tu sesión venció. Inicia sesión nuevamente.',
+              pedirLogin: true,
+            ),
+          );
+        }
       }
     });
   }
@@ -70,14 +79,32 @@ class AuthProvider extends ChangeNotifier {
   void continuarVisitante() => contexto.continuarVisitante();
 
   Future<void> inicializar() async {
+    if (_verificando) return;
+    _verificando = true;
     var habiaSesion = false;
+    SesionOffline? local;
     try {
+      accesoOffline = null;
+      local = await SesionOffline.leer();
       final guardadoToken = await SessionStorage.getToken();
       habiaSesion = guardadoToken != null;
       final guardadoUsuario = await SessionStorage.getUser();
       final codigo =
           await SessionStorage.getEmpresaCodigo() ??
           guardadoUsuario?.empresaCodigo;
+      if (local != null &&
+          (codigo != local.empresa.codigo ||
+              guardadoUsuario?.id != local.usuario.id)) {
+        local = null;
+      }
+      if (local != null &&
+          (await Connectivity().checkConnectivity()).contains(
+            ConnectivityResult.none,
+          )) {
+        accesoOffline = local;
+        contexto.suspenderParaOffline();
+        return;
+      }
       if (guardadoToken != null &&
           guardadoUsuario?.esAdminSaas == true &&
           ContextoSesion.sesionValida(guardadoToken, guardadoUsuario!)) {
@@ -91,6 +118,7 @@ class AuthProvider extends ChangeNotifier {
         );
         await contexto.seleccionar(
           EmpresaPublica.fromJson(res as Map<String, dynamic>),
+          recuperar: true,
         );
         if (guardadoToken != null &&
             guardadoUsuario != null &&
@@ -98,7 +126,27 @@ class AuthProvider extends ChangeNotifier {
             guardadoUsuario.empresaId == empresa?.id &&
             guardadoUsuario.empresaCodigo == empresa?.codigo) {
           await contexto.guardar(guardadoToken, guardadoUsuario);
-          await ApiClient.get(ApiConstants.perfil);
+          final respuesta =
+              await ApiClient.get(ApiConstants.perfil) as Map<String, dynamic>;
+          if (SesionOffline.disponible) {
+            final perfil = PerfilResponse.fromJson(respuesta);
+            if (perfil.id != guardadoUsuario.id ||
+                respuesta['empresa_id'] != guardadoUsuario.empresaId) {
+              throw StateError('El perfil no corresponde a la sesión.');
+            }
+            final verificado = UsuarioAutenticado(
+              id: perfil.id,
+              nombre: perfil.nombre,
+              apellido: perfil.apellido,
+              username: perfil.username,
+              correo: perfil.correo,
+              roles: perfil.roles,
+              empresaId: guardadoUsuario.empresaId,
+              empresaCodigo: guardadoUsuario.empresaCodigo,
+            );
+            await contexto.actualizar(verificado);
+            await _habilitarOffline(verificado);
+          }
         } else if (guardadoToken != null) {
           await contexto.cerrar(
             mensaje: 'Inicia sesión nuevamente para continuar.',
@@ -108,7 +156,15 @@ class AuthProvider extends ChangeNotifier {
       } else {
         await contexto.seleccionar(null);
       }
-    } catch (_) {
+    } catch (error) {
+      if (error is ApiException &&
+          error.statusCode == null &&
+          local != null &&
+          local.vigente) {
+        accesoOffline = local;
+        contexto.suspenderParaOffline();
+        return;
+      }
       await contexto.cerrar(
         mensaje:
             contexto.aviso ??
@@ -119,8 +175,23 @@ class AuthProvider extends ChangeNotifier {
       );
       if (contexto.empresa == null) _error = 'No se pudo verificar la empresa guardada. Elige una tienda disponible.';
     } finally {
+      _verificando = false;
       _inicializado = true;
       notifyListeners();
+    }
+  }
+
+  Future<void> cerrarAccesoOffline() async {
+    accesoOffline = null;
+    await contexto.cerrar(pedirLogin: true);
+    await contexto.seleccionar(null);
+  }
+
+  Future<void> _habilitarOffline(UsuarioAutenticado usuario) async {
+    try {
+      await SesionOffline.habilitar(empresa, usuario);
+    } on Exception {
+      // Un dispositivo sin bloqueo disponible conserva el acceso en línea.
     }
   }
 
@@ -179,6 +250,7 @@ class AuthProvider extends ChangeNotifier {
         );
         final login = LoginResponse.fromJson(res as Map<String, dynamic>);
         await contexto.guardar(login.accessToken, login.toUsuario());
+        await _habilitarOffline(login.toUsuario());
       });
 
   Future<bool> registrar({
@@ -214,6 +286,7 @@ class AuthProvider extends ChangeNotifier {
     );
     final login = LoginResponse.fromJson(res as Map<String, dynamic>);
     await contexto.guardar(login.accessToken, login.toUsuario());
+    await _habilitarOffline(login.toUsuario());
   });
 
   Future<void> logout() async {

@@ -1,3 +1,7 @@
+import 'dart:async';
+
+import 'package:connectivity_plus/connectivity_plus.dart';
+
 import 'screens/notificaciones/puente_push.dart';
 import 'services/firebase_push_service.dart';
 
@@ -7,6 +11,7 @@ import 'package:intl/date_symbol_data_local.dart';
 import 'package:provider/provider.dart';
 
 import 'core/theme/app_theme.dart';
+import 'core/storage/sesion_offline.dart';
 import 'providers/auth_provider.dart';
 import 'providers/plan_provider.dart';
 import 'screens/saas/plataforma_screen.dart';
@@ -15,6 +20,8 @@ import 'providers/catalogo_provider.dart';
 import 'providers/favoritos_provider.dart';
 import 'providers/reserva_provider.dart';
 import 'screens/home/main_navigation_screen.dart';
+import 'screens/home/operaciones_offline_screen.dart';
+import 'services/sincronizacion_offline.dart';
 import 'screens/auth/empresa_screen.dart';
 import 'screens/auth/login_screen.dart';
 
@@ -72,6 +79,12 @@ class StyleARApp extends StatelessWidget {
                     ? const Scaffold(
                         body: Center(child: CircularProgressIndicator()),
                       )
+                    : auth.accesoOffline != null
+                    ? AccesoOfflineScreen(
+                        sesion: auth.accesoOffline!,
+                        reconectar: auth.inicializar,
+                        salir: auth.cerrarAccesoOffline,
+                      )
                     : auth.esAdminSaas
                     ? const PlataformaScreen()
                     : auth.modoPlataforma
@@ -96,17 +109,83 @@ class _TiendaSesion extends StatefulWidget {
   State<_TiendaSesion> createState() => _TiendaSesionState();
 }
 
-class _TiendaSesionState extends State<_TiendaSesion> {
+class _TiendaSesionState extends State<_TiendaSesion>
+    with WidgetsBindingObserver {
+  StreamSubscription<List<ConnectivityResult>>? _conexion;
+  Timer? _reintentos;
+
+  SesionOffline? _sesion(AuthProvider auth) {
+    final usuario = auth.usuario;
+    final empresa = auth.empresa;
+    if (!SesionOffline.disponible ||
+        !auth.estaAutenticado ||
+        usuario == null ||
+        empresa == null) {
+      return null;
+    }
+    final sesion = SesionOffline(
+      empresa,
+      usuario,
+      DateTime.now().add(SesionOffline.vigencia),
+    );
+    return sesion.puedeVender || sesion.puedeReservar ? sesion : null;
+  }
+
+  Future<void> _sincronizar({bool descargar = true}) async {
+    if (!mounted) return;
+    final sesion = _sesion(context.read<AuthProvider>());
+    if (sesion == null) return;
+    try {
+      if (!(await Connectivity().checkConnectivity()).contains(
+        ConnectivityResult.none,
+      )) {
+        await SincronizacionOffline.instancia.ejecutar(
+          sesion,
+          descargar: descargar,
+        );
+      }
+    } on Exception {
+      // La cola queda guardada para el siguiente intento.
+    }
+  }
+
   @override
   void initState() {
     super.initState();
+    if (SesionOffline.disponible) {
+      WidgetsBinding.instance.addObserver(this);
+      _conexion = Connectivity().onConnectivityChanged.listen((estado) {
+        if (!estado.contains(ConnectivityResult.none)) {
+          unawaited(_sincronizar());
+        }
+      });
+      _reintentos = Timer.periodic(const Duration(seconds: 30), (_) {
+        unawaited(_sincronizar(descargar: false));
+      });
+    }
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
+      unawaited(_sincronizar());
       if (context.read<AuthProvider>().esCliente) {
         context.read<CarritoProvider>().cargarCarrito();
         context.read<FavoritosProvider>().cargarFavoritos();
       }
     });
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState estado) {
+    if (estado == AppLifecycleState.resumed) {
+      unawaited(_sincronizar(descargar: false));
+    }
+  }
+
+  @override
+  void dispose() {
+    if (SesionOffline.disponible) WidgetsBinding.instance.removeObserver(this);
+    unawaited(_conexion?.cancel());
+    _reintentos?.cancel();
+    super.dispose();
   }
 
   Future<void> _cambiar() async {
@@ -117,7 +196,7 @@ class _TiendaSesionState extends State<_TiendaSesion> {
         builder: (ctx) => AlertDialog(
           title: const Text('Cambiar de empresa'),
           content: const Text(
-            'Se cerrará esta sesión y se limpiarán sus datos de este dispositivo.',
+            'Se cerrará esta sesión. Sus operaciones pendientes quedarán guardadas para esta cuenta.',
           ),
           actions: [
             TextButton(
@@ -139,6 +218,7 @@ class _TiendaSesionState extends State<_TiendaSesion> {
   @override
   Widget build(BuildContext context) {
     final auth = context.watch<AuthProvider>();
+    final sesion = _sesion(auth);
     return Column(
       children: [
         Material(
@@ -157,6 +237,17 @@ class _TiendaSesionState extends State<_TiendaSesion> {
                       style: const TextStyle(fontWeight: FontWeight.bold),
                     ),
                   ),
+                  if (sesion != null)
+                    IconButton(
+                      tooltip: 'Operaciones offline',
+                      icon: const Icon(Icons.cloud_off_outlined),
+                      onPressed: () => Navigator.of(context).push(
+                        MaterialPageRoute<void>(
+                          builder: (_) =>
+                              OperacionesOfflineScreen(sesion: sesion),
+                        ),
+                      ),
+                    ),
                   TextButton(
                     onPressed: auth.cargando ? null : _cambiar,
                     child: const Text('Cambiar empresa'),

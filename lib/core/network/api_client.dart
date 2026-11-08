@@ -6,6 +6,7 @@ import 'package:http/http.dart' as http;
 
 import '../constants/api_constants.dart';
 import '../session/contexto_sesion.dart';
+import '../storage/sesion_offline.dart';
 import 'api_exceptions.dart';
 
 class ApiClient {
@@ -59,12 +60,14 @@ class ApiClient {
               _contexto.token!,
               _contexto.usuario!,
             ))) {
-      unawaited(
-        _contexto.cerrar(
-          mensaje: 'Tu sesión venció. Inicia sesión nuevamente.',
-          pedirLogin: true,
-        ),
-      );
+      if (!SesionOffline.disponible || _contexto.usuario == null) {
+        unawaited(
+          _contexto.cerrar(
+            mensaje: 'Tu sesión venció. Inicia sesión nuevamente.',
+            pedirLogin: true,
+          ),
+        );
+      }
       throw ApiException('Tu sesión venció.', statusCode: 401);
     }
     if (_contexto.usuario != null &&

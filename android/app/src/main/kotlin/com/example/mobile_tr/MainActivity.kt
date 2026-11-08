@@ -1,6 +1,6 @@
 package com.example.mobile_tr
 
-import io.flutter.embedding.android.FlutterActivity
+import io.flutter.embedding.android.FlutterFragmentActivity
 import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.plugin.common.MethodChannel
 import android.app.Notification
@@ -11,7 +11,7 @@ import android.content.Intent
 import android.os.Build
 import android.provider.Settings
 
-class MainActivity : FlutterActivity() {
+class MainActivity : FlutterFragmentActivity() {
     private val canal = "stylear_transacciones_v1"
     private var puente: MethodChannel? = null
     private var pendiente: Map<String, Long>? = null

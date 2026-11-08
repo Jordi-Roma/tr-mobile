@@ -55,7 +55,10 @@ class ContextoSesion extends ChangeNotifier {
     }
   }
 
-  Future<void> seleccionar(EmpresaPublica? seleccion) async {
+  Future<void> seleccionar(
+    EmpresaPublica? seleccion, {
+    bool recuperar = false,
+  }) async {
     if (seleccion?.estado == 'CANCELADA') {
       throw StateError('Empresa no disponible.');
     }
@@ -68,7 +71,7 @@ class ContextoSesion extends ChangeNotifier {
     generacion++;
     notifyListeners();
     await _persistir(() async {
-      await SessionStorage.clearSession();
+      if (!recuperar) await SessionStorage.clearSession();
       await SessionStorage.setEmpresaCodigo(seleccion?.codigo);
     });
   }
@@ -109,6 +112,13 @@ class ContextoSesion extends ChangeNotifier {
     generacion++;
     notifyListeners();
     await _persistir(SessionStorage.clearSession);
+  }
+
+  void suspenderParaOffline() {
+    token = null;
+    usuario = null;
+    generacion++;
+    notifyListeners();
   }
 
   Future<void> actualizar(UsuarioAutenticado actualizado) async {
