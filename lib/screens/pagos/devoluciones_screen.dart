@@ -190,7 +190,9 @@ class _DevolucionesScreenState extends State<DevolucionesScreen>
     await showDialog<void>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: Text('Plazo: ${politica['plazo_devoluciones']} días'),
+        title: Text(
+          'Plazo: ${politica['plazo_devoluciones']} días desde la compra en tienda o la entrega a domicilio',
+        ),
         content: Text(politica['condiciones_devoluciones'].toString()),
         actions: [
           TextButton(
@@ -849,6 +851,8 @@ class _DevolucionesScreenState extends State<DevolucionesScreen>
               Text(
                 'Comprobante ${devolucion.codigo} · ${_monto(devolucion.montoAprobado)}. El estado del reintegro se muestra por separado.',
               ),
+            if (devolucion.comprobante?['nota_venta_numero'] case final numero?)
+              Text('Nota de venta original N.º $numero'),
             // BOTONES DE ACCIÓN PARA PERSONAL DE TIENDA
             if (esGestion) ...[
               // 1. REVISIÓN (Aprobar / Rechazar)

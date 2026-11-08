@@ -17,8 +17,9 @@ class CambioService {
           )
           .toList();
   static Future<List<Map<String, dynamic>>> opciones(int id) async =>
-      (await ApiClient.get('$_base/$id/opciones') as List)
-          .cast<Map<String, dynamic>>();
+      (await ApiClient.get(
+        '$_base/$id/opciones?incluir_adicionales=true',
+      ) as List).cast<Map<String, dynamic>>();
   static Future<CambioPrenda> solicitar(
     int venta,
     int linea,

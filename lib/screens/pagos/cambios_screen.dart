@@ -29,7 +29,7 @@ class _CambiosScreenState extends State<CambiosScreen> {
   List<CambioPrenda> _lista = [];
   List<VentaDevolucionElegible> _ventas = [];
   List<Map<String, dynamic>> _opciones = [];
-  int? _opcion;
+  int? _opcion, _adicional;
   Map<String, dynamic>? _politica;
   CambioPrenda? _actual;
   bool _seleccionAplicada = false;
@@ -50,6 +50,7 @@ class _CambiosScreenState extends State<CambiosScreen> {
         _ventas = [];
         _actual = null;
         _opciones = [];
+        _opcion = _adicional = null;
         _politica = null;
         _error = 'La sesión cambió. Vuelve a abrir Cambios.';
       });
@@ -189,13 +190,46 @@ class _CambiosScreenState extends State<CambiosScreen> {
       if (mounted && _actual?.id == c.id) {
         setState(() {
           _opciones = o;
-          _opcion = o.isEmpty ? null : o.first['id'] as int;
+          final reemplazos = _reemplazos(c);
+          _opcion = reemplazos.any((v) => v['id'] == c.reemplazoId)
+              ? c.reemplazoId
+              : reemplazos.firstOrNull?['id'] as int?;
+          _adicional = _adicionales(c).any((v) => v['id'] == c.adicionalId)
+              ? c.adicionalId
+              : null;
         });
       }
     } catch (e) {
       if (mounted) setState(() => _error = '$e');
     }
   }
+
+  List<Map<String, dynamic>> _reemplazos(CambioPrenda c) =>
+      _opciones.where((v) => (v['disponible'] as int) >= c.cantidad).toList();
+
+  List<Map<String, dynamic>> _adicionales(CambioPrenda c) {
+    final elegida = _reemplazos(c).where((v) => v['id'] == _opcion).firstOrNull;
+    if (elegida == null) return [];
+    final precio = double.parse('${elegida['precio']}');
+    if ((precio * 100).round() * c.cantidad >=
+        ((c.credito ?? 0) * 100).round()) {
+      return [];
+    }
+    return _opciones
+        .where(
+          (v) => v['id'] != _opcion || (v['disponible'] as int) > c.cantidad,
+        )
+        .toList();
+  }
+
+  DropdownMenuItem<int> _opcionPrenda(Map<String, dynamic> o) =>
+      DropdownMenuItem(
+        value: o['id'] as int,
+        child: Text(
+          '${o['producto']} · ${o['talla']}/${o['color']} · Bs ${o['precio']}',
+          overflow: TextOverflow.ellipsis,
+        ),
+      );
 
   Future<void> _aceptar(CambioPrenda c) async {
     final ok = await showDialog<bool>(
@@ -238,6 +272,11 @@ class _CambiosScreenState extends State<CambiosScreen> {
     }
 
     final version = {'version': c.version};
+    final reemplazos = _reemplazos(c);
+    final adicionales = _adicionales(c);
+    final cotizacionEditada =
+        _opcion != null &&
+        (_opcion != c.reemplazoId || _adicional != c.adicionalId);
     return Card(
       child: Padding(
         padding: const EdgeInsets.all(16),
@@ -310,34 +349,49 @@ class _CambiosScreenState extends State<CambiosScreen> {
                 'Consultar reemplazos disponibles',
                 () => _opcionesDisponibles(c),
               ),
-              if (_opciones.isEmpty)
+              if (reemplazos.isEmpty)
                 const Text(
                   'Consulta disponibilidad o continúa por devolución.',
                 ),
-              if (_opciones.isNotEmpty) ...[
+              if (reemplazos.isNotEmpty) ...[
                 DropdownButtonFormField<int>(
+                  key: ValueKey((c.id, _opcion)),
                   isExpanded: true,
                   initialValue: _opcion,
                   decoration: const InputDecoration(
                     labelText: 'Prenda de reemplazo',
                   ),
-                  items: _opciones
-                      .map(
-                        (o) => DropdownMenuItem(
-                          value: o['id'] as int,
-                          child: Text(
-                            '${o['producto']} · ${o['talla']}/${o['color']} · Bs ${o['precio']}',
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                        ),
-                      )
-                      .toList(),
-                  onChanged: (v) => setState(() => _opcion = v),
+                  items: reemplazos.map(_opcionPrenda).toList(),
+                  onChanged: (v) => setState(() {
+                    _opcion = v;
+                    _adicional = null;
+                  }),
                 ),
+                if (adicionales.isNotEmpty)
+                  DropdownButtonFormField<int>(
+                    key: ValueKey((c.id, _opcion, _adicional)),
+                    isExpanded: true,
+                    initialValue: _adicional ?? 0,
+                    decoration: const InputDecoration(
+                      labelText: 'Usar el saldo en una prenda adicional',
+                    ),
+                    items: [
+                      const DropdownMenuItem(
+                        value: 0,
+                        child: Text('Recibir el reintegro de la diferencia'),
+                      ),
+                      ...adicionales.map(_opcionPrenda),
+                    ],
+                    onChanged: (v) =>
+                        setState(() => _adicional = v == 0 ? null : v),
+                  ),
                 _boton(
                   'Cotizar reemplazo',
-                  () =>
-                      accion('cotizar', {...version, 'reemplazo_id': _opcion}),
+                  () => accion('cotizar', {
+                    ...version,
+                    'reemplazo_id': _opcion,
+                    'adicional_id': _adicional,
+                  }),
                   habilitado: _opcion != null,
                 ),
               ],
@@ -372,8 +426,16 @@ class _CambiosScreenState extends State<CambiosScreen> {
               Text(
                 'Diferencia: ${_monto(c.diferencia)} (positivo: pagar; negativo: reintegro)',
               ),
+            if (c.adicional case final adicional?)
+              Text(
+                'Prenda adicional: ${adicional['producto']} · ${adicional['talla']}/${adicional['color']} · ${_monto(c.precioAdicional)}',
+              ),
             if (!_gestion && c.estado == 'COTIZADO')
-              _boton('Aceptar reemplazo y diferencia', () => _aceptar(c)),
+              _boton(
+                'Aceptar reemplazo y diferencia',
+                () => _aceptar(c),
+                habilitado: !cotizacionEditada,
+              ),
             if (!_gestion && c.estado == 'ESPERA_PAGO') ...[
               if (c.pago == null)
                 Wrap(
@@ -455,6 +517,35 @@ class _CambiosScreenState extends State<CambiosScreen> {
                   'ESPERA_PAGO',
                 ].contains(c.estado))
               _boton('Desistir del cambio', () => accion('cancelar', version)),
+            if (_gestion &&
+                ['LISTO', 'ESPERA_PAGO', 'ESPERA_REINTEGRO'].contains(c.estado))
+              _boton(
+                'Registrar falta de reemplazo y continuar por devolución',
+                () async {
+                  final confirmar = await showDialog<bool>(
+                    context: context,
+                    builder: (ctx) => AlertDialog(
+                      title: const Text('Reemplazo no disponible'),
+                      content: const Text(
+                        'Confirma que las prendas del cambio no se pueden entregar.',
+                      ),
+                      actions: [
+                        TextButton(
+                          onPressed: () => Navigator.pop(ctx, false),
+                          child: const Text('Volver'),
+                        ),
+                        FilledButton(
+                          onPressed: () => Navigator.pop(ctx, true),
+                          child: const Text('Continuar por devolución'),
+                        ),
+                      ],
+                    ),
+                  );
+                  if (confirmar == true && mounted) {
+                    accion('sin-reemplazo', version);
+                  }
+                },
+              ),
             if (c.estado == 'DEVOLUCION')
               _boton(
                 'Abrir devoluciones',
@@ -465,8 +556,10 @@ class _CambiosScreenState extends State<CambiosScreen> {
               ),
             if (c.comprobante != null)
               Text(
-                'Comprobante ${c.comprobante!['codigo']} · crédito Bs ${c.comprobante!['credito']} · diferencia Bs ${c.comprobante!['diferencia']}',
+                'Comprobante ${c.comprobante!['codigo']} · venta original ${c.original.ventaCodigo} · crédito Bs ${c.comprobante!['credito']} · diferencia Bs ${c.comprobante!['diferencia']}',
               ),
+            if (c.comprobante?['nota_venta_numero'] case final numero?)
+              Text('Nota de venta original N.º $numero'),
           ],
         ),
       ),
@@ -510,7 +603,7 @@ class _CambiosScreenState extends State<CambiosScreen> {
                 if (!_gestion) ...[
                   Text(
                     _politica?['cambios_habilitados'] == true
-                        ? 'Plazo: ${_politica!['plazo_cambios']} días. ${_politica!['condiciones_cambios']}'
+                        ? 'Plazo: ${_politica!['plazo_cambios']} días desde la compra en tienda o la entrega a domicilio. ${_politica!['condiciones_cambios']}'
                         : 'La empresa no habilitó cambios.',
                   ),
                   const Text(
@@ -550,7 +643,7 @@ class _CambiosScreenState extends State<CambiosScreen> {
                       onTap: () => setState(() {
                         _actual = c;
                         _opciones = [];
-                        _opcion = null;
+                        _opcion = _adicional = null;
                         _condicion = '';
                         _noVendibles = 0;
                         _recibida = false;
