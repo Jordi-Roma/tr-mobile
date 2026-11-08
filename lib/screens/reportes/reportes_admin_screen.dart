@@ -4,6 +4,7 @@ import '../../providers/auth_provider.dart';
 import '../../providers/plan_provider.dart';
 import '../saas/saas_widgets.dart';
 import 'dashboard_comercial_tab.dart';
+import 'analitica_screen.dart';
 import 'programados_reportes_tab.dart';
 
 import 'dart:convert';
@@ -931,44 +932,29 @@ class _ReportesAdminScreenState extends State<ReportesAdminScreen>
     return Scaffold(
       backgroundColor: AppColors.background,
       appBar: AppBar(
-        backgroundColor: AppColors.primary,
-        foregroundColor: Colors.white,
+        backgroundColor: AppColors.surface,
+        foregroundColor: AppColors.textPrimary,
         elevation: 0,
         title: const Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
               'Reportes & Dashboard',
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
               style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
             ),
             Text(
               'Panel de análisis',
-              style: TextStyle(fontSize: 11, color: Colors.white70),
+              style: TextStyle(fontSize: 11, color: AppColors.textSecondary),
             ),
           ],
         ),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.mic, color: AppColors.accent),
-            tooltip: 'Generar reporte por voz / IA',
-            onPressed: _abrirDialogoVoz,
-          ),
-          IconButton(
-            icon: const Icon(Icons.refresh),
-            tooltip: 'Recargar',
-            onPressed: () {
-              if (_tabController.index == 2) {
-              } else {
-                _generarReporte(irAResultados: false);
-              }
-            },
-          ),
-        ],
         bottom: TabBar(
           controller: _tabController,
           indicatorColor: AppColors.accent,
-          labelColor: Colors.white,
-          unselectedLabelColor: Colors.white60,
+          labelColor: AppColors.textPrimary,
+          unselectedLabelColor: AppColors.textSecondary,
           isScrollable: true,
           tabs: [
             const Tab(icon: Icon(Icons.tune, size: 18), text: 'Filtros'),
@@ -985,28 +971,65 @@ class _ReportesAdminScreenState extends State<ReportesAdminScreen>
           ],
         ),
       ),
-      body: _cargandoCatalogo
-          ? const Center(
-              child: CircularProgressIndicator(color: AppColors.accent),
-            )
-          : _errorCatalogo != null
-          ? _ErrorView(mensaje: _errorCatalogo!, onReintentar: _cargarCatalogo)
-          : TabBarView(
-              controller: _tabController,
+      body: Column(
+        children: [
+          Padding(
+            padding: const EdgeInsets.all(12),
+            child: Wrap(
+              spacing: 8,
+              runSpacing: 8,
               children: [
-                _buildFiltrosTab(),
-                _buildResultadosTab(),
-                if (_catalogo != null)
-                  DashboardComercialTab(
-                    catalogo: _catalogo!,
-                    encargado: !_esAdmin,
-                  )
-                else
-                  const SizedBox.shrink(),
-                if (_esAdmin && _catalogo != null)
-                  ProgramadosReportesTab(catalogo: _catalogo!),
+                FilledButton.icon(
+                  icon: const Icon(Icons.insights),
+                  label: const Text('Analítica inteligente'),
+                  onPressed: () => Navigator.of(context).push(
+                    MaterialPageRoute<void>(
+                      builder: (_) => const AnaliticaScreen(),
+                    ),
+                  ),
+                ),
+                OutlinedButton.icon(
+                  icon: const Icon(Icons.mic),
+                  label: const Text('Reporte por voz'),
+                  onPressed: _abrirDialogoVoz,
+                ),
+                OutlinedButton.icon(
+                  icon: const Icon(Icons.refresh),
+                  label: const Text('Actualizar'),
+                  onPressed: () => _generarReporte(irAResultados: false),
+                ),
               ],
             ),
+          ),
+          Expanded(
+            child: _cargandoCatalogo
+                ? const Center(
+                    child: CircularProgressIndicator(color: AppColors.accent),
+                  )
+                : _errorCatalogo != null
+                ? _ErrorView(
+                    mensaje: _errorCatalogo!,
+                    onReintentar: _cargarCatalogo,
+                  )
+                : TabBarView(
+                    controller: _tabController,
+                    children: [
+                      _buildFiltrosTab(),
+                      _buildResultadosTab(),
+                      if (_catalogo != null)
+                        DashboardComercialTab(
+                          catalogo: _catalogo!,
+                          encargado: !_esAdmin,
+                        )
+                      else
+                        const SizedBox.shrink(),
+                      if (_esAdmin && _catalogo != null)
+                        ProgramadosReportesTab(catalogo: _catalogo!),
+                    ],
+                  ),
+          ),
+        ],
+      ),
     );
   }
 

@@ -20,17 +20,31 @@ class CambioService {
       (await ApiClient.get(
         '$_base/$id/opciones?incluir_adicionales=true',
       ) as List).cast<Map<String, dynamic>>();
+  static Future<Map<String, dynamic>> opcionesSolicitud(
+    int venta,
+    int linea,
+    int cantidad,
+  ) async => await ApiClient.get(
+    '$_base/opciones-solicitud',
+    queryParams: {
+      'venta_id': '$venta',
+      'venta_detalle_id': '$linea',
+      'cantidad': '$cantidad',
+    },
+  ) as Map<String, dynamic>;
   static Future<CambioPrenda> solicitar(
     int venta,
     int linea,
     int cantidad,
-    String motivo,
-  ) async {
+    String motivo, {
+    int? reemplazoId,
+  }) async {
     final body = await ClavePago.preparar({
       'venta_id': venta,
       'venta_detalle_id': linea,
       'cantidad': cantidad,
       'motivo': motivo,
+      'reemplazo_id': ?reemplazoId,
     }, 'cambio-$venta-$linea');
     final r = await ApiClient.post(_base, body: body);
     await ClavePago.finalizar('cambio-$venta-$linea', 'SOLICITADO');

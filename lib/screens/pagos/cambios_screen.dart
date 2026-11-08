@@ -1,3 +1,6 @@
+import 'solicitud_cambio_dialog.dart';
+import 'selector_variante_cambio.dart';
+
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -129,58 +132,23 @@ class _CambiosScreenState extends State<CambiosScreen> {
     VentaDevolucionElegible v,
     VentaDevolucionDetalle l,
   ) async {
-    final cantidad = TextEditingController(text: '1'),
-        motivo = TextEditingController();
-    final ok = await showDialog<bool>(
+    final elegida = await showDialog<SolicitudCambioElegida>(
       context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Solicitar cambio'),
-        content: SingleChildScrollView(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Text(
-                '${l.producto} · ${l.talla}/${l.color} · Máximo ${l.cantidadDisponible}',
-              ),
-              TextField(
-                controller: cantidad,
-                keyboardType: TextInputType.number,
-                decoration: const InputDecoration(
-                  labelText: 'Cantidad a cambiar',
-                ),
-              ),
-              TextField(
-                controller: motivo,
-                maxLength: 500,
-                decoration: const InputDecoration(
-                  labelText: 'Motivo del cambio',
-                ),
-              ),
-            ],
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, false),
-            child: const Text('Volver'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.pop(ctx, true),
-            child: const Text('Enviar solicitud'),
-          ),
-        ],
+      builder: (_) => SolicitudCambioDialog(
+        venta: v.ventaId,
+        linea: l.ventaDetalleId,
+        maximo: l.cantidadDisponible,
       ),
     );
-    final n = int.tryParse(cantidad.text), m = motivo.text.trim();
-    cantidad.dispose();
-    motivo.dispose();
-    if (ok != true || !mounted) return;
-    if (n == null || n < 1 || n > l.cantidadDisponible || m.length < 5) {
-      setState(() => _error = 'Indica motivo y cantidad elegible.');
-      return;
-    }
+    if (elegida == null || !mounted) return;
     await _operar(
-      () => CambioService.solicitar(v.ventaId, l.ventaDetalleId, n, m),
+      () => CambioService.solicitar(
+        v.ventaId,
+        l.ventaDetalleId,
+        elegida.cantidad,
+        elegida.motivo,
+        reemplazoId: elegida.variante,
+      ),
     );
   }
 
@@ -193,7 +161,7 @@ class _CambiosScreenState extends State<CambiosScreen> {
           final reemplazos = _reemplazos(c);
           _opcion = reemplazos.any((v) => v['id'] == c.reemplazoId)
               ? c.reemplazoId
-              : reemplazos.firstOrNull?['id'] as int?;
+              : null;
           _adicional = _adicionales(c).any((v) => v['id'] == c.adicionalId)
               ? c.adicionalId
               : null;
@@ -288,6 +256,10 @@ class _CambiosScreenState extends State<CambiosScreen> {
               style: Theme.of(context).textTheme.titleLarge,
             ),
             Text('Motivo: ${c.original.motivo}'),
+            if (c.estado == 'SOLICITADO' && c.reemplazo != null)
+              const Text(
+                'Reemplazo solicitado y diferencia estimada. Se validarán después de inspeccionar la prenda.',
+              ),
             Text('Inspección: ${c.original.observacion ?? "Pendiente"}'),
             for (final l in c.original.detalles)
               Text(
@@ -345,23 +317,32 @@ class _CambiosScreenState extends State<CambiosScreen> {
               ),
             ],
             if (!_gestion && ['APROBADO', 'COTIZADO'].contains(c.estado)) ...[
+              if (c.reemplazoId != null)
+                _boton(
+                  c.estado == 'APROBADO'
+                      ? 'Continuar con el reemplazo solicitado'
+                      : 'Actualizar precio y disponibilidad',
+                  () => accion('cotizar', {
+                    ...version,
+                    'reemplazo_id': c.reemplazoId,
+                    'adicional_id': c.adicionalId,
+                  }),
+                ),
+
               _boton(
-                'Consultar reemplazos disponibles',
+                c.reemplazoId != null
+                    ? 'Modificar reemplazo o agregar otra prenda (opcional)'
+                    : 'Elegir reemplazo disponible',
                 () => _opcionesDisponibles(c),
               ),
               if (reemplazos.isEmpty)
                 const Text(
-                  'Consulta disponibilidad o continúa por devolución.',
+                  'El reemplazo solicitado se muestra abajo. Puedes modificarlo si necesitas otra opción.',
                 ),
               if (reemplazos.isNotEmpty) ...[
-                DropdownButtonFormField<int>(
-                  key: ValueKey((c.id, _opcion)),
-                  isExpanded: true,
-                  initialValue: _opcion,
-                  decoration: const InputDecoration(
-                    labelText: 'Prenda de reemplazo',
-                  ),
-                  items: reemplazos.map(_opcionPrenda).toList(),
+                SelectorVarianteCambio(
+                  opciones: reemplazos,
+                  seleccion: _opcion,
                   onChanged: (v) => setState(() {
                     _opcion = v;
                     _adicional = null;
@@ -432,9 +413,17 @@ class _CambiosScreenState extends State<CambiosScreen> {
               ),
             if (!_gestion && c.estado == 'COTIZADO')
               _boton(
-                'Aceptar reemplazo y diferencia',
+                (c.diferencia ?? 0) > 0
+                    ? 'Confirmar diferencia y continuar al pago'
+                    : (c.diferencia ?? 0) < 0
+                    ? 'Confirmar reintegro a mi favor'
+                    : 'Confirmar cambio sin diferencia',
                 () => _aceptar(c),
                 habilitado: !cotizacionEditada,
+              ),
+            if (!_gestion && c.estado == 'ESPERA_REINTEGRO')
+              const Text(
+                'Reintegro a tu favor pendiente. La tienda debe procesarlo por el medio original y confirmar la devolución del dinero.',
               ),
             if (!_gestion && c.estado == 'ESPERA_PAGO') ...[
               if (c.pago == null)

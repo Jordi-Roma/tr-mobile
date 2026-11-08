@@ -1,6 +1,6 @@
 import '../respaldos/respaldos_screen.dart';
 import 'mi_plan_screen.dart';
-import '../pagos/cambios_screen.dart';
+import '../pagos/posventa_screen.dart';
 import '../notificaciones/notificaciones_screen.dart';
 import 'editar_perfil_screen.dart';
 import 'direcciones_screen.dart';
@@ -21,7 +21,6 @@ import '../../widgets/custom_text_field.dart';
 import '../auth/login_screen.dart';
 import '../delivery/historial_delivery_screen.dart';
 import '../pagos/historial_pagos_screen.dart';
-import '../pagos/devoluciones_screen.dart';
 import 'proveedor_panel_screen.dart';
 
 class PerfilScreen extends StatefulWidget {
@@ -503,25 +502,14 @@ class _PerfilScreenState extends State<PerfilScreen> {
                         auth.esAdminOEncargado ||
                         roles.contains('CAJERO')) ...[
                       ListTile(
-                        leading: const Icon(Icons.swap_horiz),
-                        title: const Text('Cambios de prendas'),
-                        trailing: const Icon(Icons.chevron_right),
-                        onTap: () => Navigator.of(context).push(
-                          MaterialPageRoute(
-                            builder: (_) => const CambiosScreen(),
-                          ),
-                        ),
-                      ),
-                      const Divider(),
-                      ListTile(
                         leading: const Icon(
                           Icons.assignment_return_outlined,
                           color: AppColors.primary,
                         ),
                         title: Text(
                           auth.esAdminOEncargado || roles.contains('CAJERO')
-                              ? 'Gestión de devoluciones'
-                              : 'Mis devoluciones',
+                              ? 'Devoluciones y cambios'
+                              : 'Mis devoluciones y cambios',
                         ),
                         subtitle: Text(
                           auth.esAdminOEncargado || roles.contains('CAJERO')
@@ -532,7 +520,7 @@ class _PerfilScreenState extends State<PerfilScreen> {
                         onTap: () {
                           Navigator.of(context).push(
                             MaterialPageRoute(
-                              builder: (_) => const DevolucionesScreen(),
+                              builder: (_) => const PosventaScreen(),
                             ),
                           );
                         },

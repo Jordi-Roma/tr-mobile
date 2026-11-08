@@ -1,3 +1,6 @@
+import '../../widgets/accesos_modulo.dart';
+import 'configuracion_comercial_screen.dart';
+
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
@@ -57,12 +60,33 @@ class _HistorialPagosScreenState extends State<HistorialPagosScreen> {
     final esAdmin = auth.esAdminOEncargado;
 
     return Scaffold(
-      appBar: AppBar(
-        title: Text(esAdmin ? 'Historial de pagos' : 'Mis pagos'),
-      ),
-      body: RefreshIndicator(
-        onRefresh: _cargarPagos,
-        child: _buildBody(esAdmin),
+      appBar: AppBar(title: Text(esAdmin ? 'Historial de pagos' : 'Mis pagos')),
+      body: Column(
+        children: [
+          if (auth.esAdmin)
+            Padding(
+              padding: const EdgeInsets.all(16),
+              child: AccesosModulo(
+                accesos: [
+                  AccesoModulo(
+                    'Pagos de prueba',
+                    Icons.settings_outlined,
+                    () => Navigator.of(context).push(
+                      MaterialPageRoute<void>(
+                        builder: (_) => const ConfiguracionComercialScreen(),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          Expanded(
+            child: RefreshIndicator(
+              onRefresh: _cargarPagos,
+              child: _buildBody(esAdmin),
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -103,7 +127,11 @@ class _HistorialPagosScreenState extends State<HistorialPagosScreen> {
         padding: const EdgeInsets.all(24),
         children: const [
           SizedBox(height: 80),
-          Icon(Icons.credit_card_off_outlined, color: AppColors.textSecondary, size: 58),
+          Icon(
+            Icons.credit_card_off_outlined,
+            color: AppColors.textSecondary,
+            size: 58,
+          ),
           SizedBox(height: 12),
           Text(
             'Aún no tienes pagos registrados.',
@@ -124,10 +152,8 @@ class _HistorialPagosScreenState extends State<HistorialPagosScreen> {
           onTap: () {
             Navigator.of(context).push(
               MaterialPageRoute(
-                builder: (_) => DetallePagoScreen(
-                  ordenId: pago.ordenId,
-                  esAdmin: esAdmin,
-                ),
+                builder: (_) =>
+                    DetallePagoScreen(ordenId: pago.ordenId, esAdmin: esAdmin),
               ),
             );
           },
@@ -166,7 +192,10 @@ class _PagoCard extends StatelessWidget {
                 children: [
                   Text(
                     'Orden #${pago.ordenId}',
-                    style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 16),
+                    style: const TextStyle(
+                      fontWeight: FontWeight.w900,
+                      fontSize: 16,
+                    ),
                   ),
                   PaymentStatusBadge(estado: pago.estado),
                 ],
@@ -181,14 +210,32 @@ class _PagoCard extends StatelessWidget {
                 ),
               ),
               const SizedBox(height: 10),
-              _InfoLine(icon: Icons.receipt_long_outlined, text: pago.ventaCodigo ?? 'Venta #${pago.ventaId}'),
-              _InfoLine(icon: Icons.payment_outlined, text: '${pago.metodo} · ${pago.proveedor}'),
-              _InfoLine(icon: Icons.info_outline, text: paymentStatusVisual(pago.estado).description),
-              _InfoLine(icon: Icons.calendar_today_outlined, text: _formatFecha(pago.fechaPago ?? pago.fechaCreacion)),
+              _InfoLine(
+                icon: Icons.receipt_long_outlined,
+                text: pago.ventaCodigo ?? 'Venta #${pago.ventaId}',
+              ),
+              _InfoLine(
+                icon: Icons.payment_outlined,
+                text: '${pago.metodo} · ${pago.proveedor}',
+              ),
+              _InfoLine(
+                icon: Icons.info_outline,
+                text: paymentStatusVisual(pago.estado).description,
+              ),
+              _InfoLine(
+                icon: Icons.calendar_today_outlined,
+                text: _formatFecha(pago.fechaPago ?? pago.fechaCreacion),
+              ),
               if (pago.sucursalNombre != null)
-                _InfoLine(icon: Icons.store_outlined, text: pago.sucursalNombre!),
+                _InfoLine(
+                  icon: Icons.store_outlined,
+                  text: pago.sucursalNombre!,
+                ),
               if (mostrarCliente && pago.clienteCorreo != null)
-                _InfoLine(icon: Icons.person_outline, text: pago.clienteCorreo!),
+                _InfoLine(
+                  icon: Icons.person_outline,
+                  text: pago.clienteCorreo!,
+                ),
             ],
           ),
         ),
@@ -214,7 +261,10 @@ class _InfoLine extends StatelessWidget {
           Expanded(
             child: Text(
               text,
-              style: const TextStyle(color: AppColors.textSecondary, fontSize: 13),
+              style: const TextStyle(
+                color: AppColors.textSecondary,
+                fontSize: 13,
+              ),
             ),
           ),
         ],
